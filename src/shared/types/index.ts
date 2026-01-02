@@ -1,0 +1,154 @@
+// Phase 2 Core Types
+// Central type definitions shared between main and renderer processes
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS & LITERALS
+// ─────────────────────────────────────────────────────────────
+
+export type ModuleType = 'twilight' | 'clean' | 'stage' | 'renovate'
+
+export type VersionStatus =
+  | 'generating'
+  | 'preview_ready'
+  | 'approved'
+  | 'final_generating'
+  | 'final_ready'
+  | 'error'
+
+export type QualityTier = 'preview' | 'final'
+
+// ─────────────────────────────────────────────────────────────
+// JOB
+// ─────────────────────────────────────────────────────────────
+
+export interface JobMetadata {
+  address?: string
+  agent?: string
+  notes?: string
+}
+
+export interface Job {
+  id: string
+  name: string
+  metadata: JobMetadata
+  sceneIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// SCENE
+// ─────────────────────────────────────────────────────────────
+
+export interface Scene {
+  id: string
+  jobId: string
+  name: string
+  assetIds: string[]
+  masterAssetId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// ASSET
+// ─────────────────────────────────────────────────────────────
+
+export interface Asset {
+  id: string
+  jobId: string
+  sceneId: string
+  name: string
+  originalPath: string
+  originalThumbnailPath?: string
+  versionIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// VERSION (immutable output)
+// ─────────────────────────────────────────────────────────────
+
+export interface VersionRecipe {
+  basePrompt: string
+  injectors: string[]
+  guardrails: string[]
+  settings: Record<string, unknown>
+}
+
+export interface Version {
+  id: string
+  assetId: string
+  jobId: string
+
+  module: ModuleType
+  qualityTier: QualityTier
+  status: VersionStatus
+
+  outputPath?: string
+  thumbnailPath?: string
+  error?: string
+
+  recipe: VersionRecipe
+  sourceVersionIds: string[]
+  parentVersionId?: string
+
+  seed?: number | null
+  model?: string
+
+  createdAt: string
+  approvedAt?: string
+  finalGeneratedAt?: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// RUN (generation attempt - for history/analytics)
+// ─────────────────────────────────────────────────────────────
+
+export interface Run {
+  id: string
+  jobId: string
+  module: ModuleType
+  qualityTier: QualityTier
+  versionIds: string[]
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  createdAt: string
+  completedAt?: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// INJECTORS (data-driven, extensible)
+// ─────────────────────────────────────────────────────────────
+
+export interface Injector {
+  id: string
+  module: ModuleType
+  label: string
+  promptFragment: string
+  category?: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// FURNITURE SPEC (multi-angle staging)
+// ─────────────────────────────────────────────────────────────
+
+export interface FurnitureSpec {
+  id: string
+  sceneId: string
+  masterVersionId: string
+  description: string
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// DELIVERABLES
+// ─────────────────────────────────────────────────────────────
+
+export interface Deliverable {
+  id: string
+  jobId: string
+  versionId: string
+  exportedAt: string
+  exportPath: string
+}

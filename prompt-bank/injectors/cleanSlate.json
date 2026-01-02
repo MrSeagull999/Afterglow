@@ -1,0 +1,75 @@
+{
+  "injectors": [
+    {
+      "id": "remove_curtains",
+      "module": "clean",
+      "label": "Remove Curtains",
+      "promptFragment": "Remove all curtains, drapes, and window treatments. Leave windows bare, showing only the window frames.",
+      "category": "window_treatments"
+    },
+    {
+      "id": "remove_blinds",
+      "module": "clean",
+      "label": "Remove Blinds",
+      "promptFragment": "Remove all blinds and shades from windows. Leave windows bare, showing only the window frames.",
+      "category": "window_treatments"
+    },
+    {
+      "id": "remove_rugs",
+      "module": "clean",
+      "label": "Remove Rugs",
+      "promptFragment": "Remove all rugs and floor coverings. Reveal the underlying floor surface completely.",
+      "category": "floor_items"
+    },
+    {
+      "id": "remove_wall_art",
+      "module": "clean",
+      "label": "Remove Wall Art",
+      "promptFragment": "Remove all wall art, paintings, photographs, mirrors, and wall decorations. Leave walls clean and bare.",
+      "category": "wall_items"
+    },
+    {
+      "id": "remove_cables",
+      "module": "clean",
+      "label": "Remove Visible Cables",
+      "promptFragment": "Remove all visible cables, cords, and wires. Clean up any cable clutter.",
+      "category": "clutter"
+    },
+    {
+      "id": "remove_plants",
+      "module": "clean",
+      "label": "Remove Plants",
+      "promptFragment": "Remove all plants, both real and artificial, including potted plants, hanging plants, and vases with flowers.",
+      "category": "decor"
+    },
+    {
+      "id": "remove_ceiling_fans",
+      "module": "clean",
+      "label": "Remove Ceiling Fans",
+      "promptFragment": "Remove ceiling fans but preserve any other ceiling light fixtures.",
+      "category": "fixtures"
+    },
+    {
+      "id": "keep_built_ins",
+      "module": "clean",
+      "label": "Keep Built-in Furniture",
+      "promptFragment": "Preserve all built-in furniture such as built-in wardrobes, shelving units, and cabinetry. Only remove freestanding furniture.",
+      "category": "preservation"
+    },
+    {
+      "id": "keep_window_treatments",
+      "module": "clean",
+      "label": "Keep Window Treatments",
+      "promptFragment": "Preserve all existing curtains, blinds, and window treatments exactly as shown.",
+      "category": "preservation"
+    },
+    {
+      "id": "remove_personal_items",
+      "module": "clean",
+      "label": "Remove Personal Items",
+      "promptFragment": "Remove all personal items including family photos, personal collections, toiletries, and any items that identify the occupants.",
+      "category": "clutter"
+    }
+  ],
+  "version": "1.0.0"
+}

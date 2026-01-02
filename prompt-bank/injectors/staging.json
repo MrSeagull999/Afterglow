@@ -1,0 +1,89 @@
+{
+  "injectors": [
+    {
+      "id": "add_area_rug",
+      "module": "stage",
+      "label": "Add Area Rug",
+      "promptFragment": "Include an appropriately sized area rug that anchors the furniture arrangement and complements the design style.",
+      "category": "soft_furnishings"
+    },
+    {
+      "id": "add_curtains",
+      "module": "stage",
+      "label": "Add Curtains",
+      "promptFragment": "Add elegant floor-length curtains to the windows that complement the room's color palette and style.",
+      "category": "window_treatments"
+    },
+    {
+      "id": "add_plants",
+      "module": "stage",
+      "label": "Add Indoor Plants",
+      "promptFragment": "Include tasteful indoor plants - a mix of sizes from small potted plants to larger floor plants where appropriate.",
+      "category": "decor"
+    },
+    {
+      "id": "add_artwork",
+      "module": "stage",
+      "label": "Add Wall Art",
+      "promptFragment": "Add tasteful wall art that complements the room's style - properly scaled and positioned artwork or photography.",
+      "category": "decor"
+    },
+    {
+      "id": "minimal_staging",
+      "module": "stage",
+      "label": "Minimal Staging",
+      "promptFragment": "Use minimal furniture - only essential pieces. Keep the space feeling open and uncluttered.",
+      "category": "style_modifier"
+    },
+    {
+      "id": "luxury_staging",
+      "module": "stage",
+      "label": "Luxury Staging",
+      "promptFragment": "Use high-end, luxury furniture and finishes. Include premium materials like marble, brass, and rich textiles.",
+      "category": "style_modifier"
+    },
+    {
+      "id": "family_friendly",
+      "module": "stage",
+      "label": "Family-Friendly",
+      "promptFragment": "Stage with family-friendly furniture - durable fabrics, rounded edges, and a warm, inviting feel suitable for families with children.",
+      "category": "style_modifier"
+    },
+    {
+      "id": "add_lighting",
+      "module": "stage",
+      "label": "Add Accent Lighting",
+      "promptFragment": "Include table lamps and floor lamps to create warm, layered lighting throughout the space.",
+      "category": "lighting"
+    },
+    {
+      "id": "add_throws_cushions",
+      "module": "stage",
+      "label": "Add Throws & Cushions",
+      "promptFragment": "Add cozy throws and decorative cushions to sofas and beds for a lived-in, inviting feel.",
+      "category": "soft_furnishings"
+    },
+    {
+      "id": "neutral_palette",
+      "module": "stage",
+      "label": "Neutral Color Palette",
+      "promptFragment": "Use a neutral color palette - whites, creams, grays, and natural wood tones. Avoid bold or bright colors.",
+      "category": "color"
+    },
+    {
+      "id": "warm_palette",
+      "module": "stage",
+      "label": "Warm Color Palette",
+      "promptFragment": "Use warm colors - terracotta, rust, warm browns, and golden tones throughout the staging.",
+      "category": "color"
+    },
+    {
+      "id": "cool_palette",
+      "module": "stage",
+      "label": "Cool Color Palette",
+      "promptFragment": "Use cool colors - blues, greens, and cool grays throughout the staging.",
+      "category": "color"
+    }
+  ],
+  "version": "1.0.0"
+}

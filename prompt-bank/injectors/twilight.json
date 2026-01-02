@@ -1,0 +1,68 @@
+{
+  "injectors": [
+    {
+      "id": "dramatic_sky",
+      "module": "twilight",
+      "label": "Dramatic Sky",
+      "promptFragment": "Create a more dramatic sky with richer, deeper colors and more pronounced gradient transitions.",
+      "category": "sky"
+    },
+    {
+      "id": "subtle_sky",
+      "module": "twilight",
+      "label": "Subtle Sky",
+      "promptFragment": "Create a subtle, understated sky with soft, muted colors - elegant rather than dramatic.",
+      "category": "sky"
+    },
+    {
+      "id": "warm_interior_glow",
+      "module": "twilight",
+      "label": "Warm Interior Glow",
+      "promptFragment": "Emphasize warm, inviting interior lighting visible through windows with a cozy amber glow.",
+      "category": "lighting"
+    },
+    {
+      "id": "bright_interior",
+      "module": "twilight",
+      "label": "Bright Interior",
+      "promptFragment": "Make interior lighting brighter and more prominent, suggesting a well-lit, welcoming home.",
+      "category": "lighting"
+    },
+    {
+      "id": "landscape_lighting",
+      "module": "twilight",
+      "label": "Add Landscape Lighting",
+      "promptFragment": "Add subtle landscape lighting - pathway lights, garden uplights, and architectural accent lights where appropriate.",
+      "category": "exterior"
+    },
+    {
+      "id": "pool_lighting",
+      "module": "twilight",
+      "label": "Pool Lighting",
+      "promptFragment": "If a pool is visible, add realistic underwater pool lighting with a subtle cyan/turquoise glow.",
+      "category": "exterior"
+    },
+    {
+      "id": "no_stars",
+      "module": "twilight",
+      "label": "No Stars",
+      "promptFragment": "Do not add any stars to the sky - keep it as a pure twilight gradient.",
+      "category": "sky"
+    },
+    {
+      "id": "early_twilight",
+      "module": "twilight",
+      "label": "Early Twilight",
+      "promptFragment": "Create an early twilight look with more light in the sky - the sun has just set.",
+      "category": "timing"
+    },
+    {
+      "id": "late_twilight",
+      "module": "twilight",
+      "label": "Late Twilight",
+      "promptFragment": "Create a late twilight look with a darker sky - approaching night but still with color at the horizon.",
+      "category": "timing"
+    }
+  ],
+  "version": "1.0.0"
+}

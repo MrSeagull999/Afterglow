@@ -90,8 +90,24 @@ const electronAPI: ElectronAPI = {
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI)
 
+// Phase 2: Generic IPC invoke for new handlers
+const api = {
+  invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
+  on: (channel: string, callback: (...args: any[]) => void) => {
+    const handler = (_: any, ...args: any[]) => callback(...args)
+    ipcRenderer.on(channel, handler)
+    return () => ipcRenderer.removeListener(channel, handler)
+  }
+}
+
+contextBridge.exposeInMainWorld('api', api)
+
 declare global {
   interface Window {
     electronAPI: ElectronAPI
+    api: {
+      invoke: (channel: string, ...args: any[]) => Promise<any>
+      on: (channel: string, callback: (...args: any[]) => void) => () => void
+    }
   }
 }

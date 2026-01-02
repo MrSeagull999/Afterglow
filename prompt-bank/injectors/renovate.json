@@ -1,0 +1,68 @@
+{
+  "injectors": [
+    {
+      "id": "match_existing_style",
+      "module": "renovate",
+      "label": "Match Existing Style",
+      "promptFragment": "Ensure the new surfaces complement and match the existing design style of the room.",
+      "category": "style"
+    },
+    {
+      "id": "modern_update",
+      "module": "renovate",
+      "label": "Modern Update",
+      "promptFragment": "Choose modern, contemporary finishes that update the space with a fresh, current look.",
+      "category": "style"
+    },
+    {
+      "id": "classic_traditional",
+      "module": "renovate",
+      "label": "Classic Traditional",
+      "promptFragment": "Choose classic, traditional finishes that give the space a timeless, elegant feel.",
+      "category": "style"
+    },
+    {
+      "id": "seamless_transitions",
+      "module": "renovate",
+      "label": "Seamless Transitions",
+      "promptFragment": "Ensure seamless transitions between the changed surfaces and adjacent unchanged areas.",
+      "category": "quality"
+    },
+    {
+      "id": "natural_wood_grain",
+      "module": "renovate",
+      "label": "Natural Wood Grain",
+      "promptFragment": "For wood flooring, show realistic natural wood grain patterns with subtle variations.",
+      "category": "flooring"
+    },
+    {
+      "id": "consistent_grout",
+      "module": "renovate",
+      "label": "Consistent Grout Lines",
+      "promptFragment": "For tile flooring, ensure consistent, realistic grout lines throughout.",
+      "category": "flooring"
+    },
+    {
+      "id": "accent_wall_only",
+      "module": "renovate",
+      "label": "Accent Wall Only",
+      "promptFragment": "Only change the color of the main accent wall, leaving other walls unchanged.",
+      "category": "walls"
+    },
+    {
+      "id": "sheer_curtains",
+      "module": "renovate",
+      "label": "Sheer Curtains",
+      "promptFragment": "Use light, sheer curtains that allow natural light to filter through.",
+      "category": "curtains"
+    },
+    {
+      "id": "blackout_curtains",
+      "module": "renovate",
+      "label": "Blackout Curtains",
+      "promptFragment": "Use thick, blackout curtains suitable for bedrooms or media rooms.",
+      "category": "curtains"
+    }
+  ],
+  "version": "1.0.0"
+}

@@ -1,0 +1,177 @@
+import type { Version, VersionRecipe, FurnitureSpec } from '../../../../../shared/types'
+import { getAsset } from '../../../store/assetStore'
+import { getVersion } from '../../../store/versionStore'
+import { getScene } from '../../../store/sceneStore'
+import {
+  startPreviewGeneration,
+  completePreviewGeneration,
+  failGeneration,
+  startFinalGeneration,
+  completeFinalGeneration,
+  getOutputPath,
+  getThumbnailPath
+} from '../../shared/moduleRunner'
+import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
+import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
+import { buildStagingPrompt, buildSecondaryAnglePrompt } from './stagingPrompts'
+
+export interface StagingParams {
+  jobId: string
+  assetId: string
+  sourceVersionId: string
+  roomType?: string
+  style?: string
+  injectorIds?: string[]
+  customGuardrails?: string[]
+  model?: string
+  seed?: number | null
+}
+
+export interface MultiAngleStagingParams extends StagingParams {
+  masterVersionId: string
+  furnitureSpec: FurnitureSpec
+}
+
+export async function generateStagingPreview(params: StagingParams): Promise<Version> {
+  const asset = await getAsset(params.jobId, params.assetId)
+  if (!asset) {
+    throw new Error(`Asset not found: ${params.assetId}`)
+  }
+
+  const sourceVersion = await getVersion(params.jobId, params.sourceVersionId)
+  if (!sourceVersion?.outputPath) {
+    throw new Error(`Source version not found or has no output: ${params.sourceVersionId}`)
+  }
+
+  const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
+  const injectorIds = params.injectorIds || []
+
+  const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
+  const injectorPrompt = await buildInjectorPromptFromIds('stage', injectorIds)
+
+  const basePrompt = buildStagingPrompt({
+    roomType: params.roomType,
+    style: params.style
+  })
+  const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
+
+  const recipe: VersionRecipe = {
+    basePrompt,
+    injectors: injectorIds,
+    guardrails: guardrailIds,
+    settings: {
+      inputPath: sourceVersion.outputPath,
+      roomType: params.roomType,
+      style: params.style,
+      fullPrompt
+    }
+  }
+
+  const version = await startPreviewGeneration({
+    jobId: params.jobId,
+    assetId: params.assetId,
+    module: 'stage',
+    recipe,
+    sourceVersionIds: [params.sourceVersionId],
+    seed: params.seed,
+    model: params.model
+  })
+
+  return version
+}
+
+export async function generateSecondaryAnglePreview(params: MultiAngleStagingParams): Promise<Version> {
+  const asset = await getAsset(params.jobId, params.assetId)
+  if (!asset) {
+    throw new Error(`Asset not found: ${params.assetId}`)
+  }
+
+  const sourceVersion = await getVersion(params.jobId, params.sourceVersionId)
+  if (!sourceVersion?.outputPath) {
+    throw new Error(`Source version not found or has no output: ${params.sourceVersionId}`)
+  }
+
+  const masterVersion = await getVersion(params.jobId, params.masterVersionId)
+  if (!masterVersion?.outputPath) {
+    throw new Error(`Master version not found or has no output: ${params.masterVersionId}`)
+  }
+
+  const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
+  const injectorIds = params.injectorIds || []
+
+  const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
+  const injectorPrompt = await buildInjectorPromptFromIds('stage', injectorIds)
+
+  const basePrompt = buildSecondaryAnglePrompt({
+    furnitureSpec: params.furnitureSpec.description,
+    roomType: params.roomType,
+    style: params.style
+  })
+  const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
+
+  const recipe: VersionRecipe = {
+    basePrompt,
+    injectors: injectorIds,
+    guardrails: guardrailIds,
+    settings: {
+      inputPath: sourceVersion.outputPath,
+      masterVersionId: params.masterVersionId,
+      furnitureSpecId: params.furnitureSpec.id,
+      roomType: params.roomType,
+      style: params.style,
+      fullPrompt
+    }
+  }
+
+  const version = await startPreviewGeneration({
+    jobId: params.jobId,
+    assetId: params.assetId,
+    module: 'stage',
+    recipe,
+    sourceVersionIds: [params.sourceVersionId, params.masterVersionId],
+    seed: params.seed,
+    model: params.model
+  })
+
+  return version
+}
+
+export async function completeStagingPreview(
+  jobId: string,
+  versionId: string,
+  generatedImagePath: string
+): Promise<Version | null> {
+  const outputPath = getOutputPath(jobId, versionId, 'preview')
+  const thumbnailPath = getThumbnailPath(jobId, versionId)
+
+  return completePreviewGeneration(jobId, versionId, outputPath, thumbnailPath)
+}
+
+export async function failStagingGeneration(
+  jobId: string,
+  versionId: string,
+  error: string
+): Promise<Version | null> {
+  return failGeneration(jobId, versionId, error)
+}
+
+export async function generateStagingFinal(
+  jobId: string,
+  versionId: string
+): Promise<Version | null> {
+  const version = await getVersion(jobId, versionId)
+  if (!version || version.status !== 'approved') {
+    throw new Error('Version must be approved before generating final')
+  }
+
+  return startFinalGeneration(jobId, versionId)
+}
+
+export async function completeStagingFinal(
+  jobId: string,
+  versionId: string,
+  generatedImagePath: string
+): Promise<Version | null> {
+  const outputPath = getOutputPath(jobId, versionId, 'final')
+  return completeFinalGeneration(jobId, versionId, outputPath)
+}

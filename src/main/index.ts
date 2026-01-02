@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { config } from 'dotenv'
 import { setupIpcHandlers } from './ipc'
+import { registerAllHandlers } from './ipc/index'
 
 // Load .env from project root
 const envPath = app.isPackaged 
@@ -32,6 +33,7 @@ function createWindow(): void {
   })
 
   setupIpcHandlers(mainWindow)
+  registerAllHandlers() // Phase 2 handlers
 
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
