@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+release/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Generated data
+runs/
+afterglow-output/
+afterglow-settings.json
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Thumbnails cache
+.thumbs/
+
+# Temporary files
+*.tmp
+*.temp

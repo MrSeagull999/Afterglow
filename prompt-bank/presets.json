@@ -1,0 +1,72 @@
+{
+  "presets": [
+    {
+      "id": "twilight_exterior_classic",
+      "label": "Twilight Exterior - Classic",
+      "description": "Classic blue-hour twilight conversion for exterior real estate photos. Natural sky gradient, warm interior lights visible through windows.",
+      "promptTemplate": "Transform this real estate exterior photograph into a professional twilight/blue-hour scene. Requirements: 1) Replace the sky with a natural blue-hour gradient transitioning from deep blue at top to warm orange-pink near the horizon. 2) Add warm, inviting interior lighting visible through all windows - use soft amber/warm white tones. 3) Preserve ALL architectural details, landscaping, and composition exactly. 4) Add subtle ambient lighting to highlight the property facade. 5) Ensure natural-looking shadows consistent with dusk lighting. 6) Do not add light fixtures not in the original - only enhance existing lighting. 7) NO stars, NO lens flares, NO fantasy elements, NO oversaturation. 8) Maintain photorealistic quality suitable for professional real estate marketing. The result should look like an actual photograph taken during the golden hour before sunset.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "twilight_exterior_premium",
+      "label": "Twilight Exterior - Premium",
+      "description": "Premium twilight conversion with enhanced drama. Richer sky colors, more prominent window glow, subtle landscape lighting.",
+      "promptTemplate": "Create a premium twilight real estate photograph from this exterior image. Requirements: 1) Apply a rich, dramatic blue-hour sky with smooth gradient from deep navy blue to warm coral/amber at the horizon line. 2) Illuminate all windows with warm, inviting interior light - varying intensities to suggest occupied, welcoming spaces. 3) Add subtle landscape accent lighting (pathway lights, garden uplighting) if appropriate for the property style. 4) Preserve every architectural detail, texture, and element exactly as shown. 5) Enhance the property's curb appeal through professional twilight lighting. 6) Do not add light fixtures not in the original - only enhance existing lighting. 7) Keep colors natural and balanced - NO oversaturation, NO artificial-looking effects. 8) NO stars, NO lens flares, NO moon, NO fantasy sky elements. 9) Result must be indistinguishable from a real twilight photograph taken by a professional real estate photographer.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "twilight_interior_evening",
+      "label": "Twilight Interior - Evening",
+      "description": "Interior shot with evening ambiance. Windows show blue-hour sky, warm interior lighting creates cozy atmosphere.",
+      "promptTemplate": "Transform this interior real estate photograph into an evening/twilight scene. Requirements: 1) Through all visible windows, show a natural blue-hour twilight sky - deep blue transitioning to warm tones at horizon. 2) Adjust interior lighting to warm, inviting tones as if lamps and overhead lights are on. 3) Create a cozy, welcoming evening atmosphere while maintaining the space's professional appeal. 4) Preserve ALL furniture, decor, architectural details, and room layout exactly. 5) Ensure lighting looks natural - as if photographed in the evening with interior lights on. 6) Do not add light fixtures not in the original - only enhance existing lighting. 7) Window glow should be subtle and realistic, not overblown. 8) NO dramatic shadows, NO mood lighting that obscures details. 9) NO artificial effects, NO oversaturation. 10) Result should look like an actual evening photograph suitable for luxury real estate marketing.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "twilight_interior_night_subtle",
+      "label": "Twilight Interior - Night Subtle",
+      "description": "Subtle night interior conversion. Dark blue windows, soft warm interior lighting, elegant and understated.",
+      "promptTemplate": "Convert this interior real estate photograph to a subtle night scene. Requirements: 1) Windows should show deep twilight/early night sky - dark blue, no harsh black. 2) Interior lighting should be warm but subtle - think elegant evening showing, not bright daytime. 3) Reduce overall brightness slightly to create intimate evening atmosphere while keeping all details visible. 4) All furniture, fixtures, and architectural elements must remain perfectly preserved. 5) Lighting should appear natural - ceiling lights, lamps, under-cabinet lights as appropriate for the space. 6) Do not add light fixtures not in the original - only enhance existing lighting. 7) Maintain professional real estate photography quality - every detail should be clearly visible. 8) NO dramatic contrast, NO moody shadows that hide features. 9) NO artificial glow effects, NO oversaturation, NO color casts. 10) The result should look like a professionally photographed evening showing of the property.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "twilight_exterior_soft",
+      "label": "Twilight Exterior - Soft",
+      "description": "Soft, gentle twilight for properties that need a subtle touch. Pastel sky tones, gentle window glow.",
+      "promptTemplate": "Apply a soft, gentle twilight effect to this exterior real estate photograph. Requirements: 1) Create a soft pastel twilight sky - gentle blues and soft pink/peach tones, nothing dramatic. 2) Add subtle warm glow to windows - understated and elegant, not bright. 3) Maintain soft, even lighting across the property facade. 4) Preserve all architectural details, landscaping, and composition exactly as shown. 5) Keep the overall mood calm and inviting, not dramatic. 6) Do not add light fixtures not in the original - only enhance existing lighting. 7) Colors should be muted and natural - NO oversaturation, NO vivid colors. 8) NO stars, NO lens flares, NO fantasy elements. 9) Perfect for properties where subtlety is preferred over drama. 10) Result should look like a real photograph taken during soft twilight conditions.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "twilight_pool_luxury",
+      "label": "Twilight Pool - Luxury",
+      "description": "Specialized preset for pool/outdoor living areas. Pool lighting, ambient landscape lights, luxury evening feel.",
+      "promptTemplate": "Transform this pool/outdoor living area photograph into a luxury twilight scene. Requirements: 1) Apply beautiful blue-hour sky with natural gradient. 2) Add realistic pool lighting - subtle underwater glow in cyan/turquoise tones. 3) Include ambient landscape lighting - pathway lights, garden uplights, architectural accent lights as appropriate. 4) If house is visible, add warm interior lighting through windows. 5) Preserve all pool features, furniture, landscaping, and architectural elements exactly. 6) Do not add light fixtures not in the original - only enhance existing lighting. 7) Create an inviting resort-like evening atmosphere. 8) Water reflections should look natural with twilight sky colors. 9) NO oversaturation, NO artificial-looking lights, NO fantasy effects. 10) NO stars, NO lens flares. 11) Result should look like a professional twilight photograph of a luxury property.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    }
+  ],
+  "defaultPresetId": "twilight_exterior_classic",
+  "version": "1.0.0"
+}
