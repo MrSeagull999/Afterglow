@@ -86,7 +86,7 @@ export interface CostEstimate {
   totalCost: number
 }
 
-type View = 'home' | 'run'
+type View = 'home' | 'run' | 'jobs' | 'job'
 type Filter = 'all' | 'approved' | 'rejected' | 'pending' | 'preview_ready' | 'final_ready' | 'error'
 
 interface AppState {

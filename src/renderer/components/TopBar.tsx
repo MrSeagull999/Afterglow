@@ -1,6 +1,7 @@
 import React from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { Settings, Sun, Moon } from 'lucide-react'
+import { useJobStore } from '../store/useJobStore'
+import { Settings, Briefcase, Moon } from 'lucide-react'
 
 export function TopBar() {
   const { 
@@ -11,6 +12,7 @@ export function TopBar() {
     isProcessing,
     processingStage
   } = useAppStore()
+  const { currentJob } = useJobStore()
 
   return (
     <header className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-4 drag-region">
@@ -24,6 +26,38 @@ export function TopBar() {
             <span className="text-slate-300 text-sm">{currentRun.listingName}</span>
           </>
         )}
+        {currentJob && view === 'job' && (
+          <>
+            <span className="text-slate-500">/</span>
+            <span className="text-slate-300 text-sm">{currentJob.name}</span>
+          </>
+        )}
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-1 ml-8 no-drag">
+        <button
+          onClick={() => setView('home')}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            view === 'home' || view === 'run'
+              ? 'bg-slate-700 text-white'
+              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`}
+        >
+          <Moon className="w-4 h-4 inline mr-1.5" />
+          Twilight
+        </button>
+        <button
+          onClick={() => setView('jobs')}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            view === 'jobs' || view === 'job'
+              ? 'bg-slate-700 text-white'
+              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`}
+        >
+          <Briefcase className="w-4 h-4 inline mr-1.5" />
+          Studio
+        </button>
       </div>
 
       <div className="flex-1 flex justify-center no-drag">
@@ -41,7 +75,7 @@ export function TopBar() {
             onClick={() => setView('home')}
             className="px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors"
           >
-            ← Back to Runs
+            ← Back
           </button>
         )}
         <button
