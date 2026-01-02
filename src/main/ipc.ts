@@ -21,6 +21,7 @@ import { generateThumbnail } from './core/image/thumb'
 import { stripExif, readExif } from './core/exif'
 import { estimateCost } from './core/costEstimate'
 import { getSettings, updateSettings, Settings } from './core/settings'
+import { assembleTwilightPrompt, LightingCondition } from './core/lightingModifiers'
 
 export function setupIpcHandlers(mainWindow: BrowserWindow): void {
   ipcMain.handle('scan:directory', async (_, dirPath: string) => {
@@ -166,5 +167,9 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
       console.error('Failed to read image:', error)
       return null
     }
+  })
+
+  ipcMain.handle('prompt:assemble', async (_, basePrompt: string, lightingCondition: LightingCondition, customPrompt?: string) => {
+    return assembleTwilightPrompt(basePrompt, lightingCondition, customPrompt)
   })
 }

@@ -119,7 +119,7 @@ export async function submitBatch(
     
     onProgress?.({ stage: 'Starting batch job', current: 0, total: 1 })
     
-    const batchResult = await startBatchJob(fileUploadResult.fileUri!, apiKey)
+    const batchResult = await startBatchJob(fileUploadResult.fileUri!, apiKey, finalModel)
     if (!batchResult.success) {
       return { success: false, error: batchResult.error }
     }
@@ -185,36 +185,59 @@ async function uploadFileToGemini(
 
 async function startBatchJob(
   fileUri: string,
-  apiKey: string
+  apiKey: string,
+  model: string = 'gemini-3-pro-image-preview'
 ): Promise<{ success: boolean; batchId?: string; error?: string }> {
   try {
-    const batchUrl = `https://generativelanguage.googleapis.com/v1beta/batchJobs?key=${apiKey}`
+    // For image generation, use the model-specific batch endpoint
+    const batchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchGenerateContent`
+    
+    console.log('[BatchSubmit] Starting batch job...')
+    console.log('[BatchSubmit] URL:', batchUrl)
+    console.log('[BatchSubmit] File URI:', fileUri)
+    
+    // Extract file ID from URI (e.g., "https://.../files/abc123" -> "files/abc123")
+    const fileId = fileUri.includes('/files/') 
+      ? 'files/' + fileUri.split('/files/')[1]
+      : fileUri
+    
+    console.log('[BatchSubmit] File ID:', fileId)
+    
+    const requestBody = {
+      batch: {
+        displayName: 'AfterGlow Final Generation',
+        inputConfig: {
+          fileName: fileId
+        }
+      }
+    }
+    
+    console.log('[BatchSubmit] Request body:', JSON.stringify(requestBody, null, 2))
     
     const response = await fetch(batchUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        inputConfig: {
-          requests: {
-            fileUri
-          }
-        },
-        outputConfig: {
-          destination: {}
-        }
-      })
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify(requestBody)
     })
+    
+    console.log('[BatchSubmit] Response status:', response.status)
     
     if (!response.ok) {
       const errorText = await response.text()
+      console.error('[BatchSubmit] Error response:', errorText)
       return { success: false, error: `Batch start failed: ${response.status} - ${errorText}` }
     }
     
     const data = await response.json()
-    const batchId = data.name?.split('/').pop() || data.name
+    console.log('[BatchSubmit] Success response:', JSON.stringify(data, null, 2))
+    const batchId = data.name
     return { success: true, batchId }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[BatchSubmit] Exception:', message)
     return { success: false, error: message }
   }
 }

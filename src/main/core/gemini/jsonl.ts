@@ -61,8 +61,13 @@ export function createJsonlRequest(
   seed: number | null = null
 ): JsonlRequest {
   const generationConfig: JsonlRequest['request']['generationConfig'] = {
-    responseModalities: ['IMAGE'],
-    imagenConfig: {
+    responseModalities: ['IMAGE']
+  }
+  
+  // Only add imagenConfig for Imagen models, not for Gemini models
+  const isImagenModel = model.includes('imagen')
+  if (isImagenModel) {
+    generationConfig.imagenConfig = {
       outputOptions: {
         aspectRatio: '1:1'
       }
@@ -76,7 +81,7 @@ export function createJsonlRequest(
   return {
     customId,
     request: {
-      model,
+      model: `models/${model}`,
       contents: [{
         role: 'user',
         parts: [

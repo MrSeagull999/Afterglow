@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAppStore, ImageEntry } from '../store/useAppStore'
-import { Check, X, Eye, AlertCircle, Loader2, RefreshCw, Edit2 } from 'lucide-react'
+import { Check, X, Eye, AlertCircle, Loader2, RefreshCw, Edit2, Sun, Cloud, FileText } from 'lucide-react'
 import { PresetPicker } from './PresetPicker'
 
 interface ImageCardProps {
@@ -13,14 +13,19 @@ export function ImageCard({ image }: ImageCardProps) {
     toggleImageSelection, 
     openCompareModal,
     setImagePreset,
-    updateImageInRun
+    updateImageInRun,
+    currentRun,
+    settings
   } = useAppStore()
   
   const [thumbnail, setThumbnail] = useState<string | null>(image.thumbnailBase64 || null)
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
   const [isRetrying, setIsRetrying] = useState(false)
+  const [showPromptPreview, setShowPromptPreview] = useState(false)
   const isSelected = selectedImages.has(image.path)
+  
+  const lightingCondition = currentRun?.lightingCondition || settings.defaultLightingCondition
 
   useEffect(() => {
     if (!thumbnail && !image.thumbnailBase64) {
@@ -123,20 +128,48 @@ export function ImageCard({ image }: ImageCardProps) {
           </div>
         ) : null}
 
-        {image.previewPath && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              openCompareModal(image.path)
-            }}
-            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Compare"
-          >
-            <Eye className="w-4 h-4 text-white" />
-          </button>
-        )}
+        {/* Lighting condition indicator */}
+        <div 
+          className="absolute top-2 left-2 p-1.5 bg-black/40 backdrop-blur-sm rounded-full"
+          title={`Lighting: ${lightingCondition}`}
+        >
+          {lightingCondition === 'sunny' ? (
+            <Sun className="w-3.5 h-3.5 text-amber-400" />
+          ) : (
+            <Cloud className="w-3.5 h-3.5 text-blue-300" />
+          )}
+        </div>
 
-        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-medium text-white ${status.color}`}>
+        {/* Action buttons - top right */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {image.previewPath && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                openCompareModal(image.path)
+              }}
+              className="p-1.5 bg-black/60 hover:bg-black/80 rounded-full"
+              title="Compare original vs preview"
+            >
+              <Eye className="w-4 h-4 text-white" />
+            </button>
+          )}
+          <button
+            onClick={async (e) => {
+              e.stopPropagation()
+              const preset = await window.electronAPI.getPreset(image.presetId)
+              if (preset) {
+                setShowPromptPreview(true)
+              }
+            }}
+            className="p-1.5 bg-black/60 hover:bg-black/80 rounded-full"
+            title="View assembled prompt"
+          >
+            <FileText className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded text-xs font-medium text-white ${status.color}`}>
           {status.label}
         </div>
 
@@ -273,6 +306,113 @@ export function ImageCard({ image }: ImageCardProps) {
           </div>
         )}
       </div>
+
+      {/* Prompt Preview Modal */}
+      {showPromptPreview && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowPromptPreview(false)
+          }}
+        >
+          <div 
+            className="bg-slate-800 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-white">Assembled Prompt Preview</h3>
+                <p className="text-sm text-slate-400 mt-1">
+                  {lightingCondition === 'sunny' ? '☀️ Sunny' : '☁️ Overcast'} lighting • {image.presetId}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPromptPreview(false)}
+                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              <PromptPreviewContent 
+                presetId={image.presetId}
+                lightingCondition={lightingCondition}
+                customPrompt={customPrompt}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PromptPreviewContent({ 
+  presetId, 
+  lightingCondition, 
+  customPrompt 
+}: { 
+  presetId: string
+  lightingCondition: 'overcast' | 'sunny'
+  customPrompt?: string 
+}) {
+  const [assembledPrompt, setAssembledPrompt] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadPrompt() {
+      try {
+        const preset = await window.electronAPI.getPreset(presetId)
+        if (preset) {
+          const result = await window.electronAPI.assemblePrompt(
+            preset.promptTemplate,
+            lightingCondition,
+            customPrompt
+          )
+          setAssembledPrompt(result)
+        }
+      } catch (error) {
+        console.error('Failed to load prompt:', error)
+        setAssembledPrompt('Error loading prompt')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadPrompt()
+  }, [presetId, lightingCondition, customPrompt])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+      </div>
+    )
+  }
+
+  const sections = assembledPrompt.split('\n\n').filter(s => s.trim())
+
+  return (
+    <div className="space-y-4">
+      {sections.map((section, i) => (
+        <div key={i} className="space-y-2">
+          {section.includes('IMPORTANT LIGHTING CORRECTION') && (
+            <div className="flex items-center gap-2 text-amber-400 text-sm font-medium">
+              <Sun className="w-4 h-4" />
+              Sunny Lighting Modifier
+            </div>
+          )}
+          {section.includes('Additional instructions:') && (
+            <div className="flex items-center gap-2 text-blue-400 text-sm font-medium">
+              <Edit2 className="w-4 h-4" />
+              Custom Instructions
+            </div>
+          )}
+          <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono bg-slate-900/50 p-3 rounded">
+            {section}
+          </pre>
+        </div>
+      ))}
     </div>
   )
 }

@@ -24,6 +24,7 @@ export interface ElectronAPI {
   getSettings: () => Promise<any>
   updateSettings: (updates: any) => Promise<any>
   readImageAsDataURL: (imagePath: string) => Promise<string | null>
+  assemblePrompt: (basePrompt: string, lightingCondition: 'overcast' | 'sunny', customPrompt?: string) => Promise<string>
   onPreviewProgress: (callback: (data: any) => void) => () => void
   onBatchProgress: (callback: (data: any) => void) => () => void
   onBatchStatus: (callback: (data: any) => void) => () => void
@@ -57,6 +58,8 @@ const electronAPI: ElectronAPI = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (updates) => ipcRenderer.invoke('settings:update', updates),
   readImageAsDataURL: (imagePath) => ipcRenderer.invoke('image:readAsDataURL', imagePath),
+  assemblePrompt: (basePrompt, lightingCondition, customPrompt) => 
+    ipcRenderer.invoke('prompt:assemble', basePrompt, lightingCondition, customPrompt),
   
   onPreviewProgress: (callback) => {
     const handler = (_: any, data: any) => callback(data)
