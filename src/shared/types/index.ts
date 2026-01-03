@@ -11,11 +11,13 @@ export type VersionStatus =
   | 'generating'
   | 'preview_ready'
   | 'approved'
+  | 'hq_generating'
+  | 'hq_ready'
   | 'final_generating'
   | 'final_ready'
   | 'error'
 
-export type QualityTier = 'preview' | 'final'
+export type QualityTier = 'preview' | 'hq_preview' | 'final'
 
 // ─────────────────────────────────────────────────────────────
 // JOB
@@ -57,7 +59,7 @@ export interface Scene {
 export interface Asset {
   id: string
   jobId: string
-  sceneId: string
+  sceneId?: string  // Optional - assets can exist without scene assignment
   name: string
   originalPath: string
   originalThumbnailPath?: string

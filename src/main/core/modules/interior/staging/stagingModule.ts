@@ -38,9 +38,17 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
     throw new Error(`Asset not found: ${params.assetId}`)
   }
 
-  const sourceVersion = await getVersion(params.jobId, params.sourceVersionId)
-  if (!sourceVersion?.outputPath) {
-    throw new Error(`Source version not found or has no output: ${params.sourceVersionId}`)
+  // Handle original image source (for empty rooms)
+  let sourceVersionIds: string[] = []
+  if (params.sourceVersionId.startsWith('original:')) {
+    // Using original image, no source version
+    sourceVersionIds = []
+  } else {
+    const sourceVersion = await getVersion(params.jobId, params.sourceVersionId)
+    if (!sourceVersion?.outputPath) {
+      throw new Error(`Source version not found or has no output: ${params.sourceVersionId}`)
+    }
+    sourceVersionIds = [params.sourceVersionId]
   }
 
   const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
@@ -55,12 +63,21 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
   })
   const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
 
+  // Determine input path
+  let inputPath: string
+  if (sourceVersionIds.length === 0) {
+    inputPath = asset.originalPath
+  } else {
+    const sourceVersion = await getVersion(params.jobId, sourceVersionIds[0])
+    inputPath = sourceVersion!.outputPath!
+  }
+
   const recipe: VersionRecipe = {
     basePrompt,
     injectors: injectorIds,
     guardrails: guardrailIds,
     settings: {
-      inputPath: sourceVersion.outputPath,
+      inputPath,
       roomType: params.roomType,
       style: params.style,
       fullPrompt
@@ -72,7 +89,7 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
     assetId: params.assetId,
     module: 'stage',
     recipe,
-    sourceVersionIds: [params.sourceVersionId],
+    sourceVersionIds,
     seed: params.seed,
     model: params.model
   })

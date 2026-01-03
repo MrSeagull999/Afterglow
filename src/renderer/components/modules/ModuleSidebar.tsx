@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useModuleStore } from '../../store/useModuleStore'
 import { useJobStore } from '../../store/useJobStore'
 import type { ModuleType } from '../../../shared/types'
@@ -6,6 +6,7 @@ import { CleanSlatePanel } from './CleanSlatePanel'
 import { StagingPanel } from './StagingPanel'
 import { RenovatePanel } from './RenovatePanel'
 import { TwilightPanel } from './TwilightPanel'
+import { ModuleInputPicker } from './ModuleInputPicker'
 import {
   Sparkles,
   Eraser,
@@ -43,9 +44,9 @@ const MODULES: { id: ModuleType; label: string; icon: React.ReactNode; descripti
 ]
 
 export function ModuleSidebar() {
-  const { activeModule, setActiveModule, loadInjectorsForModule, loadGuardrailsForModule } =
+  const { activeModule, setActiveModule, loadInjectorsForModule, loadGuardrailsForModule, selectedInput, setSelectedInput } =
     useModuleStore()
-  const { currentAsset } = useJobStore()
+  const { currentJob, currentAsset, setCurrentAsset, assets } = useJobStore()
 
   const handleSelectModule = async (moduleId: ModuleType) => {
     if (activeModule === moduleId) {
@@ -56,6 +57,34 @@ export function ModuleSidebar() {
     }
   }
 
+  // Listen for selectModule events from Library "Run Module" action
+  useEffect(() => {
+    const handleEvent = (e: CustomEvent<{ module: string; assetId: string }>) => {
+      handleSelectModule(e.detail.module as ModuleType)
+      // Also set the input from the asset
+      const asset = assets.find(a => a.id === e.detail.assetId)
+      if (asset) {
+        setSelectedInput({
+          type: 'original',
+          assetId: asset.id,
+          assetName: asset.name
+        })
+      }
+    }
+    window.addEventListener('selectModule', handleEvent as EventListener)
+    return () => window.removeEventListener('selectModule', handleEvent as EventListener)
+  }, [assets])
+
+  // Sync selectedInput with currentAsset for module generation
+  useEffect(() => {
+    if (selectedInput && currentJob) {
+      const asset = assets.find(a => a.id === selectedInput.assetId)
+      if (asset && currentAsset?.id !== asset.id) {
+        setCurrentAsset(asset)
+      }
+    }
+  }, [selectedInput, assets, currentJob])
+
   return (
     <div className="h-full flex flex-col">
       {/* Module List */}
@@ -65,12 +94,7 @@ export function ModuleSidebar() {
             <button
               key={module.id}
               onClick={() => handleSelectModule(module.id)}
-              disabled={!currentAsset}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
-                currentAsset
-                  ? 'hover:bg-slate-700/50 cursor-pointer'
-                  : 'opacity-50 cursor-not-allowed'
-              }`}
+              className="w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors hover:bg-slate-700/50 cursor-pointer"
             >
               <div className="p-2 bg-slate-700 rounded-lg text-slate-300">{module.icon}</div>
               <div className="flex-1 min-w-0">
@@ -81,11 +105,9 @@ export function ModuleSidebar() {
             </button>
           ))}
 
-          {!currentAsset && (
-            <div className="p-4 text-center text-slate-500 text-sm">
-              Select an asset to use modules
-            </div>
-          )}
+          <div className="p-4 text-center text-slate-500 text-sm">
+            Select a module, then choose input from Library
+          </div>
         </div>
       ) : (
         <div className="flex-1 overflow-hidden flex flex-col">
@@ -101,6 +123,14 @@ export function ModuleSidebar() {
             <h3 className="text-lg font-medium text-white mt-2">
               {MODULES.find((m) => m.id === activeModule)?.label}
             </h3>
+          </div>
+
+          {/* Input Picker - at top of all module settings */}
+          <div className="flex-shrink-0 p-3 border-b border-slate-700">
+            <ModuleInputPicker
+              selectedInput={selectedInput}
+              onSelectInput={setSelectedInput}
+            />
           </div>
 
           {/* Module Panel */}

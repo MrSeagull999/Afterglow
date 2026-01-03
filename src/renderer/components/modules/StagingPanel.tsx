@@ -104,22 +104,30 @@ export function StagingPanel() {
       {/* Source Version */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          Source (Clean Slate)
+          Source (Clean Slate or Original)
         </label>
         <select
           value={stagingSettings.sourceVersionId || ''}
           onChange={(e) => setStagingSourceVersion(e.target.value || null)}
           className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
         >
-          <option value="">Select a clean slate version...</option>
+          <option value="">Select source...</option>
+          {currentAsset && (
+            <option value={`original:${currentAsset.id}`}>
+              Use Original Image (skip Clean Slate)
+            </option>
+          )}
           {chainableVersions
             .filter((v) => v.module === 'clean')
             .map((v) => (
               <option key={v.id} value={v.id}>
-                {v.assetName} - {v.status}
+                {v.assetName} - Clean Slate - {v.status}
               </option>
             ))}
         </select>
+        <p className="text-xs text-slate-500 mt-1">
+          Use original for already-empty rooms, or select Clean Slate version for furnished rooms
+        </p>
       </div>
 
       {/* Room Type */}

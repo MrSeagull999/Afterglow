@@ -43,8 +43,9 @@ interface JobState {
   // Actions - Assets
   setAssets: (assets: Asset[]) => void
   setCurrentAsset: (asset: Asset | null) => void
+  loadAssetsForJob: (jobId: string) => Promise<void>
   loadAssetsForScene: (jobId: string, sceneId: string) => Promise<void>
-  createAsset: (jobId: string, sceneId: string, name: string, sourcePath: string) => Promise<Asset>
+  createAsset: (jobId: string, sceneId: string | undefined, name: string, sourcePath: string) => Promise<Asset>
   updateAsset: (jobId: string, assetId: string, updates: Partial<Asset>) => Promise<void>
   deleteAsset: (jobId: string, assetId: string) => Promise<void>
   toggleAssetSelection: (assetId: string) => void
@@ -172,6 +173,17 @@ export const useJobStore = create<JobState>((set, get) => ({
   // Assets
   setAssets: (assets) => set({ assets }),
   setCurrentAsset: (asset) => set({ currentAsset: asset }),
+
+  loadAssetsForJob: async (jobId) => {
+    set({ isLoadingAssets: true })
+    try {
+      const assets = await window.api.invoke('asset:listForJob', jobId)
+      set({ assets, isLoadingAssets: false })
+    } catch (error) {
+      console.error('Failed to load assets for job:', error)
+      set({ isLoadingAssets: false })
+    }
+  },
 
   loadAssetsForScene: async (jobId, sceneId) => {
     set({ isLoadingAssets: true })

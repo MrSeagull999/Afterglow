@@ -1,7 +1,7 @@
-import type { Version, ModuleType, VersionStatus } from '../../../shared/types'
+import type { Version, ModuleType, VersionStatus, Asset } from '../../../shared/types'
 import { getJob } from '../store/jobStore'
-import { listScenesForJob } from '../store/sceneStore'
-import { listAssetsForScene } from '../store/assetStore'
+import { listScenesForJob, getScene } from '../store/sceneStore'
+import { listAssetsForJob, getAsset } from '../store/assetStore'
 import { listVersionsForAsset } from '../store/versionStore'
 
 export interface LibraryQuery {
@@ -16,7 +16,7 @@ export interface LibraryQuery {
 }
 
 export interface LibraryVersion extends Version {
-  sceneName: string
+  sceneName: string  // Empty string if asset has no scene
   assetName: string
 }
 
@@ -25,38 +25,43 @@ export async function queryLibrary(query: LibraryQuery): Promise<LibraryVersion[
   if (!job) return []
 
   const results: LibraryVersion[] = []
+  
+  // Get ALL assets for the job (not just scene-assigned ones)
+  const allAssets = await listAssetsForJob(query.jobId)
+  
+  // Build scene name lookup
+  const sceneNames: Record<string, string> = {}
   const scenes = await listScenesForJob(query.jobId)
-
   for (const scene of scenes) {
-    if (query.sceneId && scene.id !== query.sceneId) continue
+    sceneNames[scene.id] = scene.name
+  }
 
-    const assets = await listAssetsForScene(query.jobId, scene.id)
+  for (const asset of allAssets) {
+    // Filter by sceneId if specified
+    if (query.sceneId && asset.sceneId !== query.sceneId) continue
+    if (query.assetId && asset.id !== query.assetId) continue
 
-    for (const asset of assets) {
-      if (query.assetId && asset.id !== query.assetId) continue
+    const versions = await listVersionsForAsset(query.jobId, asset.id)
 
-      const versions = await listVersionsForAsset(query.jobId, asset.id)
+    for (const version of versions) {
+      if (query.module && version.module !== query.module) continue
 
-      for (const version of versions) {
-        if (query.module && version.module !== query.module) continue
-
-        if (query.status) {
-          const statuses = Array.isArray(query.status) ? query.status : [query.status]
-          if (!statuses.includes(version.status)) continue
-        }
-
-        if (query.qualityTier && version.qualityTier !== query.qualityTier) continue
-
-        if (query.approvedOnly && version.status !== 'approved' && version.status !== 'final_ready') continue
-
-        if (query.finalOnly && version.status !== 'final_ready') continue
-
-        results.push({
-          ...version,
-          sceneName: scene.name,
-          assetName: asset.name
-        })
+      if (query.status) {
+        const statuses = Array.isArray(query.status) ? query.status : [query.status]
+        if (!statuses.includes(version.status)) continue
       }
+
+      if (query.qualityTier && version.qualityTier !== query.qualityTier) continue
+
+      if (query.approvedOnly && version.status !== 'approved' && version.status !== 'final_ready') continue
+
+      if (query.finalOnly && version.status !== 'final_ready') continue
+
+      results.push({
+        ...version,
+        sceneName: asset.sceneId ? (sceneNames[asset.sceneId] || '') : '',
+        assetName: asset.name
+      })
     }
   }
 

@@ -16,25 +16,34 @@ function getAssetPath(jobId: string, assetId: string): string {
 
 export async function createAsset(params: {
   jobId: string
-  sceneId: string
+  sceneId?: string  // Optional - assets can exist without scene
   name: string
-  sourcePath: string
+  sourcePath?: string  // Optional - for import via path
+  originalPath?: string  // Optional - for direct path reference
 }): Promise<Asset> {
   const assetId = generateAssetId()
   const jobDir = getJobDirectory(params.jobId)
 
-  const ext = extname(params.sourcePath)
-  const originalFilename = `${assetId}${ext}`
-  const originalPath = join(jobDir, 'originals', originalFilename)
+  let finalOriginalPath: string
 
-  await copyFile(params.sourcePath, originalPath)
+  if (params.sourcePath) {
+    const ext = extname(params.sourcePath)
+    const originalFilename = `${assetId}${ext}`
+    finalOriginalPath = join(jobDir, 'originals', originalFilename)
+    await copyFile(params.sourcePath, finalOriginalPath)
+  } else if (params.originalPath) {
+    // Direct path reference (already exists)
+    finalOriginalPath = params.originalPath
+  } else {
+    throw new Error('Either sourcePath or originalPath must be provided')
+  }
 
   const asset: Asset = {
     id: assetId,
     jobId: params.jobId,
-    sceneId: params.sceneId,
-    name: params.name || basename(params.sourcePath, ext),
-    originalPath,
+    sceneId: params.sceneId,  // Can be undefined
+    name: params.name || basename(params.sourcePath || params.originalPath || '', extname(params.sourcePath || params.originalPath || '')),
+    originalPath: finalOriginalPath,
     versionIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -43,7 +52,10 @@ export async function createAsset(params: {
   const assetPath = getAssetPath(params.jobId, assetId)
   await writeFile(assetPath, JSON.stringify(asset, null, 2))
 
-  await addAssetToScene(params.jobId, params.sceneId, assetId)
+  // Only add to scene if sceneId is provided
+  if (params.sceneId) {
+    await addAssetToScene(params.jobId, params.sceneId, assetId)
+  }
 
   return asset
 }
@@ -83,7 +95,10 @@ export async function deleteAsset(jobId: string, assetId: string): Promise<boole
   const assetPath = getAssetPath(jobId, assetId)
   await rm(assetPath, { force: true })
 
-  await removeAssetFromScene(jobId, asset.sceneId, assetId)
+  // Only remove from scene if asset was assigned to one
+  if (asset.sceneId) {
+    await removeAssetFromScene(jobId, asset.sceneId, assetId)
+  }
 
   return true
 }
@@ -102,6 +117,31 @@ export async function listAssetsForScene(jobId: string, sceneId: string): Promis
   }
 
   return assets
+}
+
+export async function listAssetsForJob(jobId: string): Promise<Asset[]> {
+  const { readdir } = await import('fs/promises')
+  const jobDir = getJobDirectory(jobId)
+  const assetsDir = join(jobDir, 'assets')
+
+  if (!existsSync(assetsDir)) return []
+
+  const files = await readdir(assetsDir)
+  const assets: Asset[] = []
+
+  for (const file of files) {
+    if (file.endsWith('.json')) {
+      const assetId = file.replace('.json', '')
+      const asset = await getAsset(jobId, assetId)
+      if (asset) {
+        assets.push(asset)
+      }
+    }
+  }
+
+  return assets.sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
 }
 
 export async function addVersionToAsset(jobId: string, assetId: string, versionId: string): Promise<Asset | null> {
@@ -129,4 +169,47 @@ export async function removeVersionFromAsset(jobId: string, assetId: string, ver
 
 export async function setAssetThumbnail(jobId: string, assetId: string, thumbnailPath: string): Promise<Asset | null> {
   return updateAsset(jobId, assetId, { originalThumbnailPath: thumbnailPath })
+}
+
+export async function assignAssetToScene(jobId: string, assetId: string, sceneId: string): Promise<Asset | null> {
+  const asset = await getAsset(jobId, assetId)
+  if (!asset) return null
+
+  // If already assigned to a different scene, remove from old scene first
+  if (asset.sceneId && asset.sceneId !== sceneId) {
+    await removeAssetFromScene(jobId, asset.sceneId, assetId)
+  }
+
+  // Update asset's sceneId
+  const assetPath = join(getJobDirectory(jobId), 'assets', `${assetId}.json`)
+  const updatedAsset: Asset = {
+    ...asset,
+    sceneId,
+    updatedAt: new Date().toISOString()
+  }
+  await writeFile(assetPath, JSON.stringify(updatedAsset, null, 2))
+
+  // Add to new scene
+  await addAssetToScene(jobId, sceneId, assetId)
+
+  return updatedAsset
+}
+
+export async function unassignAssetFromScene(jobId: string, assetId: string): Promise<Asset | null> {
+  const asset = await getAsset(jobId, assetId)
+  if (!asset || !asset.sceneId) return asset
+
+  // Remove from scene
+  await removeAssetFromScene(jobId, asset.sceneId, assetId)
+
+  // Update asset's sceneId to undefined
+  const assetPath = join(getJobDirectory(jobId), 'assets', `${assetId}.json`)
+  const updatedAsset: Asset = {
+    ...asset,
+    sceneId: undefined,
+    updatedAt: new Date().toISOString()
+  }
+  await writeFile(assetPath, JSON.stringify(updatedAsset, null, 2))
+
+  return updatedAsset
 }

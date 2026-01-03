@@ -3,6 +3,7 @@ import { join } from 'path'
 import { config } from 'dotenv'
 import { setupIpcHandlers } from './ipc'
 import { registerAllHandlers } from './ipc/index'
+import { migrateJobsToUserData, hasLegacyJobs, getDataBasePath } from './core/paths'
 
 // Load .env from project root
 const envPath = app.isPackaged 
@@ -47,7 +48,22 @@ function createWindow(): void {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Log data storage location
+  console.log('Data storage path:', getDataBasePath())
+  
+  // Migrate legacy jobs from project folder to userData
+  if (hasLegacyJobs()) {
+    console.log('[Migration] Found legacy jobs folder, starting migration...')
+    const { migrated, errors } = await migrateJobsToUserData()
+    if (migrated.length > 0) {
+      console.log(`[Migration] Successfully migrated ${migrated.length} jobs`)
+    }
+    if (errors.length > 0) {
+      console.error('[Migration] Errors:', errors)
+    }
+  }
+  
   createWindow()
 
   app.on('activate', () => {

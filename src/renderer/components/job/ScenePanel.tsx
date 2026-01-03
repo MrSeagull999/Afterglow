@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useJobStore } from '../../store/useJobStore'
 import { useAppStore } from '../../store/useAppStore'
-import type { Scene } from '../../../shared/types'
+import type { Scene, Asset } from '../../../shared/types'
 import {
   Plus,
   ChevronRight,
@@ -11,24 +11,31 @@ import {
   MoreVertical,
   Edit2,
   Trash2,
-  Loader2
+  Loader2,
+  Library,
+  Check,
+  X
 } from 'lucide-react'
 
 export function ScenePanel() {
   const {
     currentJob,
     scenes,
+    assets,
     currentScene,
     setCurrentScene,
     createScene,
     deleteScene,
-    loadAssetsForScene
+    loadAssetsForScene,
+    loadAssetsForJob
   } = useJobStore()
   const { addToast } = useAppStore()
 
   const [isCreating, setIsCreating] = useState(false)
   const [newSceneName, setNewSceneName] = useState('')
   const [showNewSceneInput, setShowNewSceneInput] = useState(false)
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false)
+  const [pickerTargetSceneId, setPickerTargetSceneId] = useState<string | null>(null)
 
   const handleCreateScene = async () => {
     if (!currentJob || !newSceneName.trim()) return
@@ -53,6 +60,34 @@ export function ScenePanel() {
     await loadAssetsForScene(currentJob.id, scene.id)
   }
 
+  const handleAddFromLibrary = (sceneId: string) => {
+    if (!currentJob) return
+    setPickerTargetSceneId(sceneId)
+    loadAssetsForJob(currentJob.id) // Load all assets for the picker
+    setShowLibraryPicker(true)
+  }
+
+  const handleAssignAssets = async (assetIds: string[]) => {
+    if (!currentJob || !pickerTargetSceneId) return
+    
+    try {
+      for (const assetId of assetIds) {
+        await window.api.invoke('asset:assignToScene', currentJob.id, assetId, pickerTargetSceneId)
+      }
+      addToast(`Added ${assetIds.length} asset(s) to scene`, 'success')
+      
+      // Reload scene assets if this is the current scene
+      if (currentScene?.id === pickerTargetSceneId) {
+        await loadAssetsForScene(currentJob.id, pickerTargetSceneId)
+      }
+    } catch (error) {
+      addToast('Failed to add assets to scene', 'error')
+    }
+    
+    setShowLibraryPicker(false)
+    setPickerTargetSceneId(null)
+  }
+
   const handleDeleteScene = async (scene: Scene, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!currentJob) return
@@ -70,8 +105,23 @@ export function ScenePanel() {
     }
   }
 
+  // Get unassigned assets (assets not in any scene)
+  const unassignedAssets = assets.filter(a => !a.sceneId)
+
   return (
     <div className="h-full flex flex-col">
+      {/* Library Picker Modal */}
+      {showLibraryPicker && (
+        <LibraryAssetPicker
+          assets={unassignedAssets}
+          onSelect={handleAssignAssets}
+          onClose={() => {
+            setShowLibraryPicker(false)
+            setPickerTargetSceneId(null)
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="p-3 border-b border-slate-700">
         <div className="flex items-center justify-between mb-2">
@@ -122,7 +172,7 @@ export function ScenePanel() {
           <div className="p-4 text-center text-slate-500">
             <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No scenes yet</p>
-            <p className="text-xs mt-1">Create a scene to organize your images</p>
+            <p className="text-xs mt-1">Scenes group images for multi-angle consistency</p>
           </div>
         ) : (
           <div className="p-2 space-y-1">
@@ -133,6 +183,7 @@ export function ScenePanel() {
                 isSelected={currentScene?.id === scene.id}
                 onSelect={() => handleSelectScene(scene)}
                 onDelete={(e) => handleDeleteScene(scene, e)}
+                onAddFromLibrary={() => handleAddFromLibrary(scene.id)}
               />
             ))}
           </div>
@@ -146,12 +197,14 @@ function SceneItem({
   scene,
   isSelected,
   onSelect,
-  onDelete
+  onDelete,
+  onAddFromLibrary
 }: {
   scene: Scene
   isSelected: boolean
   onSelect: () => void
   onDelete: (e: React.MouseEvent) => void
+  onAddFromLibrary: () => void
 }) {
   const [showMenu, setShowMenu] = useState(false)
 
@@ -209,6 +262,17 @@ function SceneItem({
               onClick={(e) => {
                 e.stopPropagation()
                 setShowMenu(false)
+                onAddFromLibrary()
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700"
+            >
+              <Library className="w-4 h-4" />
+              Add from Library
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowMenu(false)
                 // TODO: Implement rename
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700"
@@ -229,6 +293,137 @@ function SceneItem({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// Modal picker for selecting Library assets to add to a scene
+function LibraryAssetPicker({
+  assets,
+  onSelect,
+  onClose
+}: {
+  assets: Asset[]
+  onSelect: (assetIds: string[]) => void
+  onClose: () => void
+}) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    async function loadThumbnails() {
+      const thumbs: Record<string, string> = {}
+      for (const asset of assets) {
+        try {
+          const dataUrl = await window.electronAPI.readImageAsDataURL(asset.originalPath)
+          if (dataUrl) thumbs[asset.id] = dataUrl
+        } catch (error) {
+          console.error('Failed to load thumbnail:', error)
+        }
+      }
+      setThumbnails(thumbs)
+    }
+    loadThumbnails()
+  }, [assets])
+
+  const toggleSelection = (assetId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(assetId)) {
+        next.delete(assetId)
+      } else {
+        next.add(assetId)
+      }
+      return next
+    })
+  }
+
+  const handleConfirm = () => {
+    onSelect(Array.from(selectedIds))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-slate-800 rounded-xl shadow-2xl w-[500px] max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+          <h3 className="text-lg font-medium text-white">Add from Library</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-700 rounded">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {assets.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <Library className="w-10 h-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">No unassigned assets in Library</p>
+              <p className="text-xs mt-1">Import photos to Library first</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {assets.map(asset => (
+                <div
+                  key={asset.id}
+                  onClick={() => toggleSelection(asset.id)}
+                  className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                    selectedIds.has(asset.id)
+                      ? 'border-blue-500 ring-2 ring-blue-500/30'
+                      : 'border-transparent hover:border-slate-600'
+                  }`}
+                >
+                  {thumbnails[asset.id] ? (
+                    <img
+                      src={thumbnails[asset.id]}
+                      alt={asset.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                      <Image className="w-6 h-6 text-slate-600" />
+                    </div>
+                  )}
+                  
+                  {/* Selection indicator */}
+                  {selectedIds.has(asset.id) && (
+                    <div className="absolute top-1 right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  
+                  {/* Name overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <p className="text-xs text-white truncate">{asset.name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between p-4 border-t border-slate-700">
+          <span className="text-sm text-slate-400">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selectedIds.size === 0}
+              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg transition-colors"
+            >
+              Add to Scene
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

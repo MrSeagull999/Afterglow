@@ -1,9 +1,13 @@
-import { readFile, writeFile, mkdir, readdir, rm } from 'fs/promises'
+import { readFile, writeFile, readdir, rm } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import type { Job, JobMetadata } from '../../../shared/types'
-
-const JOBS_DIR = process.env.JOBS_DIR || './jobs'
+import {
+  getJobsBasePath,
+  getJobPath,
+  ensureJobsBasePath,
+  ensureJobDirectories
+} from '../paths'
 
 function generateJobId(): string {
   const now = new Date()
@@ -15,33 +19,14 @@ function generateJobId(): string {
   return `job_${timestamp}_${random}`
 }
 
-async function ensureJobsDir(): Promise<void> {
-  if (!existsSync(JOBS_DIR)) {
-    await mkdir(JOBS_DIR, { recursive: true })
-  }
-}
-
-async function getJobDir(jobId: string): Promise<string> {
-  const jobDir = join(JOBS_DIR, jobId)
-  if (!existsSync(jobDir)) {
-    await mkdir(jobDir, { recursive: true })
-    await mkdir(join(jobDir, 'scenes'), { recursive: true })
-    await mkdir(join(jobDir, 'assets'), { recursive: true })
-    await mkdir(join(jobDir, 'versions'), { recursive: true })
-    await mkdir(join(jobDir, 'originals'), { recursive: true })
-    await mkdir(join(jobDir, 'outputs'), { recursive: true })
-  }
-  return jobDir
-}
-
 export async function createJob(params: {
   name: string
   metadata?: JobMetadata
 }): Promise<Job> {
-  await ensureJobsDir()
+  await ensureJobsBasePath()
 
   const jobId = generateJobId()
-  const jobDir = await getJobDir(jobId)
+  const jobDir = await ensureJobDirectories(jobId)
 
   const job: Job = {
     id: jobId,
@@ -57,11 +42,11 @@ export async function createJob(params: {
 }
 
 export async function getJob(jobId: string): Promise<Job | null> {
-  const jobPath = join(JOBS_DIR, jobId, 'job.json')
-  if (!existsSync(jobPath)) {
+  const jobJsonPath = join(getJobPath(jobId), 'job.json')
+  if (!existsSync(jobJsonPath)) {
     return null
   }
-  const data = await readFile(jobPath, 'utf-8')
+  const data = await readFile(jobJsonPath, 'utf-8')
   return JSON.parse(data)
 }
 
@@ -75,13 +60,13 @@ export async function updateJob(jobId: string, updates: Partial<Omit<Job, 'id' |
     updatedAt: new Date().toISOString()
   }
 
-  const jobPath = join(JOBS_DIR, jobId, 'job.json')
-  await writeFile(jobPath, JSON.stringify(updatedJob, null, 2))
+  const jobJsonPath = join(getJobPath(jobId), 'job.json')
+  await writeFile(jobJsonPath, JSON.stringify(updatedJob, null, 2))
   return updatedJob
 }
 
 export async function deleteJob(jobId: string): Promise<boolean> {
-  const jobDir = join(JOBS_DIR, jobId)
+  const jobDir = getJobPath(jobId)
   if (!existsSync(jobDir)) {
     return false
   }
@@ -90,9 +75,10 @@ export async function deleteJob(jobId: string): Promise<boolean> {
 }
 
 export async function listJobs(): Promise<Job[]> {
-  await ensureJobsDir()
+  await ensureJobsBasePath()
 
-  const entries = await readdir(JOBS_DIR, { withFileTypes: true })
+  const jobsDir = getJobsBasePath()
+  const entries = await readdir(jobsDir, { withFileTypes: true })
   const jobs: Job[] = []
 
   for (const entry of entries) {
@@ -133,5 +119,5 @@ export async function removeSceneFromJob(jobId: string, sceneId: string): Promis
 }
 
 export function getJobDirectory(jobId: string): string {
-  return join(JOBS_DIR, jobId)
+  return getJobPath(jobId)
 }

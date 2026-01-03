@@ -97,6 +97,11 @@ const api = {
     const handler = (_: any, ...args: any[]) => callback(...args)
     ipcRenderer.on(channel, handler)
     return () => ipcRenderer.removeListener(channel, handler)
+  },
+  onVersionProgress: (callback: (data: { versionId: string; progress: number }) => void) => {
+    const handler = (_: any, data: { versionId: string; progress: number }) => callback(data)
+    ipcRenderer.on('version:progress', handler)
+    return () => ipcRenderer.removeListener('version:progress', handler)
   }
 }
 
@@ -108,6 +113,7 @@ declare global {
     api: {
       invoke: (channel: string, ...args: any[]) => Promise<any>
       on: (channel: string, callback: (...args: any[]) => void) => () => void
+      onVersionProgress: (callback: (data: { versionId: string; progress: number }) => void) => () => void
     }
   }
 }

@@ -18,13 +18,13 @@ import {
   Settings
 } from 'lucide-react'
 
-type SidebarTab = 'scenes' | 'library' | 'modules'
+type SidebarTab = 'library' | 'scenes' | 'modules'
 
 export function JobPage() {
   const { currentJob, scenes, loadScenesForJob, currentScene, resetJobContext } = useJobStore()
   const { loadJobStats, jobStats } = useLibraryStore()
   const { setView, addToast } = useAppStore()
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('scenes')
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('library')  // Library is default
 
   useEffect(() => {
     if (currentJob) {
@@ -32,6 +32,17 @@ export function JobPage() {
       loadJobStats(currentJob.id)
     }
   }, [currentJob?.id])
+
+  // Listen for openModule events from Library
+  useEffect(() => {
+    const handleOpenModule = (e: CustomEvent<{ module: string; assetId: string }>) => {
+      setSidebarTab('modules')
+      // The ModuleSidebar will handle selecting the module
+      window.dispatchEvent(new CustomEvent('selectModule', { detail: e.detail }))
+    }
+    window.addEventListener('openModule', handleOpenModule as EventListener)
+    return () => window.removeEventListener('openModule', handleOpenModule as EventListener)
+  }, [])
 
   const handleBack = () => {
     resetJobContext()
@@ -90,19 +101,19 @@ export function JobPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Tabs */}
         <aside className="w-80 border-r border-slate-700 flex flex-col bg-slate-800/30">
-          {/* Tab Buttons */}
+          {/* Tab Buttons - Library first (primary workspace) */}
           <div className="flex border-b border-slate-700">
-            <TabButton
-              active={sidebarTab === 'scenes'}
-              onClick={() => setSidebarTab('scenes')}
-              icon={<Layers className="w-4 h-4" />}
-              label="Scenes"
-            />
             <TabButton
               active={sidebarTab === 'library'}
               onClick={() => setSidebarTab('library')}
               icon={<Grid3X3 className="w-4 h-4" />}
               label="Library"
+            />
+            <TabButton
+              active={sidebarTab === 'scenes'}
+              onClick={() => setSidebarTab('scenes')}
+              icon={<Layers className="w-4 h-4" />}
+              label="Scenes"
             />
             <TabButton
               active={sidebarTab === 'modules'}

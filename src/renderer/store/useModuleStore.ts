@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ModuleType, Injector, Version } from '../../shared/types'
+import type { ModuleType, Injector, Version, VersionStatus, QualityTier } from '../../shared/types'
 import type { RenovateChanges } from '../../main/core/modules/interior/renovate/renovatePrompts'
 
 interface Guardrail {
@@ -9,9 +9,23 @@ interface Guardrail {
   appliesTo: ModuleType[]
 }
 
+// Shared input selection for all modules
+export interface ModuleInput {
+  type: 'original' | 'version'
+  assetId: string
+  assetName: string
+  versionId?: string
+  versionStatus?: VersionStatus
+  qualityTier?: QualityTier
+  thumbnailPath?: string
+}
+
 interface ModuleState {
   // Active module
   activeModule: ModuleType | null
+
+  // Shared input selection (used by all modules)
+  selectedInput: ModuleInput | null
 
   // Injectors & Guardrails
   injectors: Injector[]
@@ -58,6 +72,7 @@ interface ModuleState {
 
   // Actions
   setActiveModule: (module: ModuleType | null) => void
+  setSelectedInput: (input: ModuleInput | null) => void
   loadInjectorsForModule: (module: ModuleType) => Promise<void>
   loadGuardrailsForModule: (module: ModuleType) => Promise<void>
   toggleInjector: (injectorId: string) => void
@@ -105,6 +120,7 @@ const defaultRenovateChanges: RenovateChanges = {
 export const useModuleStore = create<ModuleState>((set, get) => ({
   // Initial state
   activeModule: null,
+  selectedInput: null,
   injectors: [],
   guardrails: [],
   selectedInjectorIds: new Set(),
@@ -146,6 +162,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
 
   // Actions
   setActiveModule: (module) => set({ activeModule: module }),
+  setSelectedInput: (input) => set({ selectedInput: input }),
 
   loadInjectorsForModule: async (module) => {
     try {
@@ -287,6 +304,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
   resetModuleSettings: () =>
     set({
       activeModule: null,
+      selectedInput: null,
       selectedInjectorIds: new Set(),
       cleanSlateSettings: { sourceVersionId: null },
       stagingSettings: {

@@ -20,7 +20,10 @@ import {
   getAsset,
   updateAsset,
   deleteAsset,
-  listAssetsForScene
+  listAssetsForScene,
+  listAssetsForJob,
+  assignAssetToScene,
+  unassignAssetFromScene
 } from '../core/store/assetStore'
 
 export function registerJobHandlers(): void {
@@ -89,5 +92,17 @@ export function registerJobHandlers(): void {
 
   ipcMain.handle('asset:listForScene', async (_event, jobId: string, sceneId: string) => {
     return listAssetsForScene(jobId, sceneId)
+  })
+
+  ipcMain.handle('asset:listForJob', async (_event, jobId: string) => {
+    return listAssetsForJob(jobId)
+  })
+
+  ipcMain.handle('asset:assignToScene', async (_event, jobId: string, assetId: string, sceneId: string) => {
+    return assignAssetToScene(jobId, assetId, sceneId)
+  })
+
+  ipcMain.handle('asset:unassignFromScene', async (_event, jobId: string, assetId: string) => {
+    return unassignAssetFromScene(jobId, assetId)
   })
 }

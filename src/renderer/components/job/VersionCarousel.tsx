@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useJobStore } from '../../store/useJobStore'
 import { useAppStore } from '../../store/useAppStore'
 import type { Version } from '../../../shared/types'
@@ -14,7 +14,8 @@ import {
   Image,
   Sparkles,
   Clock,
-  Zap
+  Zap,
+  Download
 } from 'lucide-react'
 
 const MODULE_LABELS: Record<string, { label: string; color: string }> = {
@@ -28,8 +29,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   generating: { label: 'Generating...', color: 'bg-blue-600' },
   preview_ready: { label: 'Preview', color: 'bg-slate-600' },
   approved: { label: 'Approved', color: 'bg-emerald-600' },
+  hq_generating: { label: 'HQ Generating...', color: 'bg-cyan-600' },
+  hq_ready: { label: 'HQ Preview', color: 'bg-cyan-600' },
   final_generating: { label: 'Finalizing...', color: 'bg-purple-600' },
-  final_ready: { label: 'Final', color: 'bg-amber-600' },
+  final_ready: { label: '4K Final', color: 'bg-amber-600' },
   error: { label: 'Error', color: 'bg-red-600' }
 }
 
@@ -51,6 +54,21 @@ export function VersionCarousel() {
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showRecipe, setShowRecipe] = useState(false)
+  const [versionProgress, setVersionProgress] = useState<Record<string, number>>({})
+
+  // Listen for progress updates
+  useEffect(() => {
+    const unsubscribe = window.api.onVersionProgress((data) => {
+      setVersionProgress(prev => ({ ...prev, [data.versionId]: data.progress }))
+      // Reload versions when complete
+      if (data.progress >= 100 && currentJob && currentAsset) {
+        setTimeout(() => {
+          loadVersionsForAsset(currentJob.id, currentAsset.id)
+        }, 500)
+      }
+    })
+    return unsubscribe
+  }, [currentJob?.id, currentAsset?.id])
 
   useEffect(() => {
     if (currentJob && currentAsset) {
@@ -221,6 +239,22 @@ export function VersionCarousel() {
                   {new Date(currentVersion.createdAt).toLocaleString()}
                 </div>
 
+                {/* Progress bar for generating versions */}
+                {(currentVersion.status === 'generating' || currentVersion.status === 'final_generating') && (
+                  <div className="mb-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                      <span>{currentVersion.status === 'final_generating' ? 'Generating 4K...' : 'Generating...'}</span>
+                      <span>{versionProgress[currentVersion.id] || 0}%</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${versionProgress[currentVersion.id] || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex items-center gap-2">
                   <button
@@ -238,6 +272,46 @@ export function VersionCarousel() {
                     <Check className="w-4 h-4" />
                     {currentVersion.status === 'approved' ? 'Approved' : 'Approve'}
                   </button>
+
+                  {/* Generate HQ Preview button - for approved versions (for chaining) */}
+                  {currentVersion.status === 'approved' && (
+                    <button
+                      onClick={async () => {
+                        if (!currentJob) return
+                        try {
+                          await window.api.invoke('version:generateHQPreview', currentJob.id, currentVersion.id)
+                          addToast('HQ Preview generation started', 'success')
+                          loadVersionsForAsset(currentJob.id, currentAsset!.id)
+                        } catch (error) {
+                          addToast('Failed to start HQ generation', 'error')
+                        }
+                      }}
+                      className="p-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
+                      title="Generate HQ Preview (~3K, for chaining)"
+                    >
+                      <Zap className="w-4 h-4 text-white" />
+                    </button>
+                  )}
+
+                  {/* Generate 4K Final button - for approved or hq_ready versions */}
+                  {(currentVersion.status === 'approved' || currentVersion.status === 'hq_ready') && (
+                    <button
+                      onClick={async () => {
+                        if (!currentJob) return
+                        try {
+                          await window.api.invoke('version:generateFinal', currentJob.id, currentVersion.id)
+                          addToast('4K Final generation started', 'success')
+                          loadVersionsForAsset(currentJob.id, currentAsset!.id)
+                        } catch (error) {
+                          addToast('Failed to start final generation', 'error')
+                        }
+                      }}
+                      className="p-2 bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors"
+                      title="Generate 4K Final (for delivery)"
+                    >
+                      <Download className="w-4 h-4 text-white" />
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setShowRecipe(true)}
@@ -259,6 +333,7 @@ export function VersionCarousel() {
                     onClick={handleDelete}
                     disabled={
                       currentVersion.status === 'approved' ||
+                      currentVersion.status === 'hq_ready' ||
                       currentVersion.status === 'final_ready'
                     }
                     className="p-2 bg-slate-700 hover:bg-red-600 disabled:opacity-50 disabled:hover:bg-slate-700 rounded-lg transition-colors"

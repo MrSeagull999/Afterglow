@@ -17,6 +17,9 @@ afterglow-output/
 afterglow-settings.json
 *.log
 
+# Legacy job folders (migrated to userData)
+jobs/
+
 # IDE
 .idea/
 .vscode/
