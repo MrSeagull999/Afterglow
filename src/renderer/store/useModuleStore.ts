@@ -20,12 +20,24 @@ export interface ModuleInput {
   thumbnailPath?: string
 }
 
+// Batch execution state
+interface BatchExecutionState {
+  isRunning: boolean
+  totalCount: number
+  completedCount: number
+  failedIds: Set<string>
+  results: Map<string, { versionId: string; status: VersionStatus }>
+}
+
 interface ModuleState {
   // Active module
   activeModule: ModuleType | null
 
-  // Shared input selection (used by all modules)
+  // Shared input selection (used by all modules) - DEPRECATED, use grid selection
   selectedInput: ModuleInput | null
+
+  // Batch execution
+  batchExecution: BatchExecutionState
 
   // Injectors & Guardrails
   injectors: Injector[]
@@ -36,6 +48,7 @@ interface ModuleState {
   // Module-specific settings
   cleanSlateSettings: {
     sourceVersionId: string | null
+    customInstructions: string
   }
 
   stagingSettings: {
@@ -82,6 +95,7 @@ interface ModuleState {
 
   // Clean Slate
   setCleanSlateSourceVersion: (versionId: string | null) => void
+  setCleanSlateCustomInstructions: (instructions: string) => void
 
   // Staging
   setStagingSourceVersion: (versionId: string | null) => void
@@ -121,13 +135,24 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
   // Initial state
   activeModule: null,
   selectedInput: null,
+  
+  // Batch execution initial state
+  batchExecution: {
+    isRunning: false,
+    totalCount: 0,
+    completedCount: 0,
+    failedIds: new Set(),
+    results: new Map()
+  },
+
   injectors: [],
   guardrails: [],
   selectedInjectorIds: new Set(),
   selectedGuardrailIds: new Set(),
 
   cleanSlateSettings: {
-    sourceVersionId: null
+    sourceVersionId: null,
+    customInstructions: ''
   },
 
   stagingSettings: {
@@ -220,6 +245,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       cleanSlateSettings: { ...state.cleanSlateSettings, sourceVersionId: versionId }
     })),
 
+  setCleanSlateCustomInstructions: (instructions) =>
+    set((state) => ({
+      cleanSlateSettings: { ...state.cleanSlateSettings, customInstructions: instructions }
+    })),
+
   // Staging
   setStagingSourceVersion: (versionId) =>
     set((state) => ({
@@ -306,7 +336,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       activeModule: null,
       selectedInput: null,
       selectedInjectorIds: new Set(),
-      cleanSlateSettings: { sourceVersionId: null },
+      cleanSlateSettings: { sourceVersionId: null, customInstructions: '' },
       stagingSettings: {
         sourceVersionId: null,
         roomType: 'living room',

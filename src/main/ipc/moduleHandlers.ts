@@ -150,6 +150,160 @@ export function registerModuleHandlers(): void {
     return deleteFurnitureSpec(jobId, specId)
   })
 
+  // ─────────────────────────────────────────────────────────────
+  // BATCH GENERATION HANDLERS (for grid-first workflow)
+  // ─────────────────────────────────────────────────────────────
+
+  // Batch Clean Slate generation
+  ipcMain.handle('module:clean:batchGenerate', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    injectorIds?: string[]
+    guardrailIds?: string[]
+  }) => {
+    const { jobId, assetIds, injectorIds, guardrailIds } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    for (const assetId of assetIds) {
+      try {
+        const version = await generateCleanSlatePreview({
+          jobId,
+          assetId,
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || []
+        })
+        
+        // Start generation in background
+        generateVersionPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[CleanSlate Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // Batch Staging generation
+  ipcMain.handle('module:stage:batchGenerate', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    roomType?: string
+    style?: string
+    sourceVersionId?: string
+    injectorIds?: string[]
+    guardrailIds?: string[]
+  }) => {
+    const { jobId, assetIds, roomType, style, sourceVersionId, injectorIds, guardrailIds } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    for (const assetId of assetIds) {
+      try {
+        // Use provided sourceVersionId or default to original image
+        const source = sourceVersionId || `original:${assetId}`
+        
+        const version = await generateStagingPreview({
+          jobId,
+          assetId,
+          sourceVersionId: source,
+          roomType: roomType || 'living room',
+          style: style || 'modern contemporary',
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || []
+        })
+        
+        generateVersionPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[Staging Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // Batch Renovate generation
+  ipcMain.handle('module:renovate:batchGenerate', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    changes?: any
+    sourceVersionId?: string
+    injectorIds?: string[]
+    guardrailIds?: string[]
+  }) => {
+    const { jobId, assetIds, changes, sourceVersionId, injectorIds, guardrailIds } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    for (const assetId of assetIds) {
+      try {
+        // Use provided sourceVersionId or default to original image
+        const source = sourceVersionId || `original:${assetId}`
+        
+        const version = await generateRenovatePreview({
+          jobId,
+          assetId,
+          sourceVersionId: source,
+          changes: changes || { floor: { enabled: false, material: 'hardwood' } },
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || []
+        })
+        
+        generateVersionPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[Renovate Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // Batch Twilight generation
+  ipcMain.handle('module:twilight:batchGenerate', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    presetId?: string
+    promptTemplate?: string
+    lightingCondition?: 'overcast' | 'sunny'
+  }) => {
+    const { jobId, assetIds, presetId, promptTemplate, lightingCondition } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    // Default prompt template if not provided
+    const template = promptTemplate || 'Transform this daytime exterior photo into a stunning twilight/dusk scene. The sky should show deep blue hour colors with warm orange and pink tones near the horizon. All interior lights should be warmly lit, glowing invitingly through windows. Exterior landscape lighting should be on. Maintain all architectural details exactly as shown.'
+
+    for (const assetId of assetIds) {
+      try {
+        const version = await generateTwilightPreview({
+          jobId,
+          assetId,
+          presetId: presetId || 'twilight_exterior_classic',
+          promptTemplate: template,
+          lightingCondition: lightingCondition || 'overcast'
+        })
+        
+        generateVersionPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[Twilight Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
   // Constants for UI
   ipcMain.handle('constants:getRoomTypes', async () => {
     return ROOM_TYPES

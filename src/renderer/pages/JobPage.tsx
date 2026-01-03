@@ -3,50 +3,90 @@ import { useJobStore } from '../store/useJobStore'
 import { useLibraryStore } from '../store/useLibraryStore'
 import { useModuleStore } from '../store/useModuleStore'
 import { useAppStore } from '../store/useAppStore'
-import { ScenePanel } from '../components/job/ScenePanel'
-import { AssetWorkspace } from '../components/job/AssetWorkspace'
-import { ModuleSidebar } from '../components/modules/ModuleSidebar'
+import { ModuleRail } from '../components/modules/ModuleRail'
+import { ModuleSettingsPanel } from '../components/modules/ModuleSettingsPanel'
+import { ModuleGrid } from '../components/modules/ModuleGrid'
 import { LibraryBrowser } from '../components/library/LibraryBrowser'
+import type { ModuleType } from '../../shared/types'
 import {
   ArrowLeft,
   FolderOpen,
-  Layers,
-  Grid3X3,
-  Sparkles,
-  ChevronRight,
-  Plus,
-  Settings
+  Settings,
+  X
 } from 'lucide-react'
 
-type SidebarTab = 'library' | 'scenes' | 'modules'
-
 export function JobPage() {
-  const { currentJob, scenes, loadScenesForJob, currentScene, resetJobContext } = useJobStore()
+  const { currentJob, selectedAssetIds, resetJobContext, loadAssetsForJob } = useJobStore()
   const { loadJobStats, jobStats } = useLibraryStore()
-  const { setView, addToast } = useAppStore()
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('library')  // Library is default
+  const { 
+    activeModule, 
+    setActiveModule, 
+    loadInjectorsForModule, 
+    loadGuardrailsForModule,
+    setIsGenerating
+  } = useModuleStore()
+  const { setView, addToast, openSettingsModal } = useAppStore()
+  
+  const [showLibrary, setShowLibrary] = useState(false)
 
   useEffect(() => {
     if (currentJob) {
-      loadScenesForJob(currentJob.id)
       loadJobStats(currentJob.id)
+      loadAssetsForJob(currentJob.id)
     }
   }, [currentJob?.id])
 
-  // Listen for openModule events from Library
+  // Load injectors/guardrails when module changes
   useEffect(() => {
-    const handleOpenModule = (e: CustomEvent<{ module: string; assetId: string }>) => {
-      setSidebarTab('modules')
-      // The ModuleSidebar will handle selecting the module
-      window.dispatchEvent(new CustomEvent('selectModule', { detail: e.detail }))
+    if (activeModule) {
+      Promise.all([
+        loadInjectorsForModule(activeModule),
+        loadGuardrailsForModule(activeModule)
+      ])
     }
-    window.addEventListener('openModule', handleOpenModule as EventListener)
-    return () => window.removeEventListener('openModule', handleOpenModule as EventListener)
-  }, [])
+  }, [activeModule])
 
   const handleBack = () => {
     resetJobContext()
     setView('home')
+  }
+
+  const handleSelectModule = (module: ModuleType | null) => {
+    setActiveModule(module)
+    if (module) {
+      setShowLibrary(false)
+    }
+  }
+
+  const handleOpenLibrary = () => {
+    setShowLibrary(true)
+    setActiveModule(null)
+  }
+
+  const handleApplyToSelected = async () => {
+    if (!currentJob || !activeModule || selectedAssetIds.size === 0) {
+      addToast('Select images first', 'error')
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      // Batch execute for all selected assets
+      const assetIds = Array.from(selectedAssetIds)
+      
+      await window.api.invoke(`module:${activeModule}:batchGenerate`, {
+        jobId: currentJob.id,
+        assetIds,
+        // Module-specific settings are read from the store by the backend
+      })
+
+      addToast(`Started ${activeModule} generation for ${assetIds.length} images`, 'success')
+    } catch (error) {
+      console.error('Batch generation failed:', error)
+      addToast('Failed to start generation', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   if (!currentJob) {
@@ -92,76 +132,57 @@ export function JobPage() {
           </div>
         )}
 
-        <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors">
+        <button 
+          onClick={openSettingsModal}
+          className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+        >
           <Settings className="w-5 h-5 text-slate-400" />
         </button>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - Module Rail + Settings Panel + Grid */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Tabs */}
-        <aside className="w-80 border-r border-slate-700 flex flex-col bg-slate-800/30">
-          {/* Tab Buttons - Library first (primary workspace) */}
-          <div className="flex border-b border-slate-700">
-            <TabButton
-              active={sidebarTab === 'library'}
-              onClick={() => setSidebarTab('library')}
-              icon={<Grid3X3 className="w-4 h-4" />}
-              label="Library"
-            />
-            <TabButton
-              active={sidebarTab === 'scenes'}
-              onClick={() => setSidebarTab('scenes')}
-              icon={<Layers className="w-4 h-4" />}
-              label="Scenes"
-            />
-            <TabButton
-              active={sidebarTab === 'modules'}
-              onClick={() => setSidebarTab('modules')}
-              icon={<Sparkles className="w-4 h-4" />}
-              label="Modules"
-            />
-          </div>
+        {/* Module Rail (64px) */}
+        <ModuleRail
+          activeModule={activeModule}
+          onSelectModule={handleSelectModule}
+          onOpenLibrary={handleOpenLibrary}
+          onOpenSettings={openSettingsModal}
+        />
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
-            {sidebarTab === 'scenes' && <ScenePanel />}
-            {sidebarTab === 'library' && <LibraryBrowser />}
-            {sidebarTab === 'modules' && <ModuleSidebar />}
-          </div>
-        </aside>
+        {/* Module Settings Panel (280px, shown when module active) */}
+        {activeModule && (
+          <ModuleSettingsPanel
+            activeModule={activeModule}
+            selectedCount={selectedAssetIds.size}
+            onClose={() => setActiveModule(null)}
+            onApply={handleApplyToSelected}
+          />
+        )}
 
-        {/* Main Workspace */}
+        {/* Library Panel (shown when Library is open) */}
+        {showLibrary && !activeModule && (
+          <aside className="w-80 border-r border-slate-700 flex flex-col bg-slate-800/30">
+            <div className="flex items-center justify-between p-3 border-b border-slate-700">
+              <h3 className="text-sm font-medium text-white">Library</h3>
+              <button
+                onClick={() => setShowLibrary(false)}
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
+              >
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <LibraryBrowser />
+            </div>
+          </aside>
+        )}
+
+        {/* Main Grid Workspace */}
         <main className="flex-1 overflow-hidden">
-          <AssetWorkspace />
+          <ModuleGrid activeModule={activeModule} />
         </main>
       </div>
     </div>
-  )
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  label
-}: {
-  active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm font-medium transition-colors ${
-        active
-          ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-800/50'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }

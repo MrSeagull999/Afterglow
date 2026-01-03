@@ -20,6 +20,7 @@ export function CleanSlatePanel() {
     toggleGuardrail,
     cleanSlateSettings,
     setCleanSlateSourceVersion,
+    setCleanSlateCustomInstructions,
     isGenerating,
     setIsGenerating
   } = useModuleStore()
@@ -46,7 +47,8 @@ export function CleanSlatePanel() {
         assetId: currentAsset.id,
         sourceVersionId: cleanSlateSettings.sourceVersionId || undefined,
         injectorIds: Array.from(selectedInjectorIds),
-        customGuardrails: Array.from(selectedGuardrailIds)
+        customGuardrails: Array.from(selectedGuardrailIds),
+        customInstructions: cleanSlateSettings.customInstructions
       })
 
       addToast('Clean Slate generation started', 'success')
@@ -95,6 +97,23 @@ export function CleanSlatePanel() {
             <span className="text-slate-400">Original image (or select from Library)</span>
           )}
         </div>
+      </div>
+
+      {/* Custom Instructions */}
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Additional Removal Instructions (Optional)
+        </label>
+        <textarea
+          value={cleanSlateSettings.customInstructions}
+          onChange={(e) => setCleanSlateCustomInstructions(e.target.value)}
+          placeholder="e.g., Remove the two pot plants near the window.&#10;Remove fireplace tools and baskets.&#10;Remove chairs but keep the table."
+          rows={4}
+          className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
+        />
+        <p className="text-xs text-slate-500 mt-1">
+          Use this to manually specify objects that should be removed if the automatic removal misses them.
+        </p>
       </div>
 
       {/* Injectors */}

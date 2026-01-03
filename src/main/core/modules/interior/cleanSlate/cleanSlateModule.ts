@@ -20,6 +20,7 @@ export interface CleanSlateParams {
   sourceVersionId?: string
   injectorIds?: string[]
   customGuardrails?: string[]
+  customInstructions?: string
   model?: string
   seed?: number | null
 }
@@ -45,7 +46,15 @@ export async function generateCleanSlatePreview(params: CleanSlateParams): Promi
   const injectorPrompt = await buildInjectorPromptFromIds('clean', injectorIds)
 
   const basePrompt = buildCleanSlatePrompt()
-  const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
+  const customInstructions = params.customInstructions?.trim() || ''
+  
+  // Assemble full prompt: base + injectors + custom instructions + guardrails
+  const fullPrompt = [
+    basePrompt,
+    injectorPrompt,
+    customInstructions ? `Additional removal requirements: ${customInstructions}` : '',
+    guardrailPrompt
+  ].filter(Boolean).join(' ')
 
   const recipe: VersionRecipe = {
     basePrompt,
@@ -53,6 +62,7 @@ export async function generateCleanSlatePreview(params: CleanSlateParams): Promi
     guardrails: guardrailIds,
     settings: {
       inputPath,
+      customInstructions,
       fullPrompt
     }
   }

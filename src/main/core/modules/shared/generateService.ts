@@ -52,6 +52,8 @@ export async function generateVersionPreview(
     const metadata = await sharp(imageBuffer).metadata()
 
     const settings = await getSettings()
+    // Preview resolution: 1536px default (sufficient for module chaining and evaluation)
+    // This is the max dimension before sending to Gemini API
     const targetWidth = settings.previewWidth || 1536
 
     let resizedBuffer: Buffer = imageBuffer as Buffer
@@ -314,7 +316,8 @@ export async function generateVersionFinal(
     const imageBuffer = await readFile(inputPath)
     const settings = await getSettings()
 
-    // For final, use higher resolution
+    // Final resolution: 4000px default (4K quality for client delivery)
+    // This is the max dimension before sending to Gemini API
     const targetWidth = settings.finalWidth || 4000
     const metadata = await sharp(imageBuffer).metadata()
 
