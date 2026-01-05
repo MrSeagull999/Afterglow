@@ -1,6 +1,7 @@
 import React from 'react'
 import { useAppStore, PreviewModel, SeedStrategy } from '../store/useAppStore'
 import { X, Info } from 'lucide-react'
+import { ProviderSettings } from './settings/ProviderSettings'
 
 export function SettingsModal() {
   const { settingsModalOpen, closeSettingsModal, settings, setSettings, addToast } = useAppStore()
@@ -31,7 +32,13 @@ export function SettingsModal() {
         </div>
 
         <div className="p-4 space-y-6">
+          {/* Provider Settings */}
           <div className="space-y-4">
+            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">AI Provider</h3>
+            <ProviderSettings />
+          </div>
+
+          <div className="border-t border-slate-700 pt-4 space-y-4">
             <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">Model Settings</h3>
             
             <div className="space-y-2">

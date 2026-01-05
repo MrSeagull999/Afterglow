@@ -7,6 +7,7 @@ export type PreviewModel = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-previe
 export type FinalModel = 'gemini-3-pro-image-preview'
 export type SeedStrategy = 'randomPerImage' | 'fixedPerRun'
 export type LightingCondition = 'overcast' | 'sunny'
+export type ImageProvider = 'google' | 'openrouter'
 
 export interface Settings {
   keepExif: boolean
@@ -23,6 +24,17 @@ export interface Settings {
   seedStrategy: SeedStrategy
   fixedRunSeed: number | null
   defaultLightingCondition: LightingCondition
+  
+  // Provider configuration (API keys in .env only)
+  imageProvider: ImageProvider
+  previewImageModel: string
+  previewPriorityMode: boolean
+  advancedCustomModel: string
+  
+  // Privacy settings
+  privacy: {
+    safeFilenamesOnImport: boolean
+  }
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -39,7 +51,18 @@ const DEFAULT_SETTINGS: Settings = {
   reusePreviewSeedForFinal: true,
   seedStrategy: 'randomPerImage',
   fixedRunSeed: null,
-  defaultLightingCondition: 'overcast'
+  defaultLightingCondition: 'overcast',
+  
+  // Provider configuration (API keys in .env only)
+  imageProvider: 'google',
+  previewImageModel: 'gemini-3-pro-image-preview',
+  previewPriorityMode: true,
+  advancedCustomModel: '',
+  
+  // Privacy settings
+  privacy: {
+    safeFilenamesOnImport: true
+  }
 }
 
 let cachedSettings: Settings | null = null

@@ -13,6 +13,7 @@ import {
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
 import { buildRenovatePrompt, RenovateChanges } from './renovatePrompts'
+import { PromptAssembler } from '../../../services/prompt/promptAssembler'
 
 export interface RenovateParams {
   jobId: string
@@ -43,7 +44,19 @@ export async function generateRenovatePreview(params: RenovateParams): Promise<V
   const injectorPrompt = await buildInjectorPromptFromIds('renovate', injectorIds)
 
   const basePrompt = buildRenovatePrompt(params.changes)
-  const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
+  
+  // Use PromptAssembler for consistent prompt building and hash generation
+  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
+  const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
+  
+  const assembled = PromptAssembler.assemble({
+    module: 'renovate',
+    basePrompt,
+    injectorPrompts,
+    guardrailPrompts
+  })
+  
+  const fullPrompt = assembled.finalPrompt
 
   const recipe: VersionRecipe = {
     basePrompt,
@@ -52,7 +65,8 @@ export async function generateRenovatePreview(params: RenovateParams): Promise<V
     settings: {
       inputPath: sourceVersion.outputPath,
       changes: params.changes,
-      fullPrompt
+      fullPrompt,
+      promptHash: assembled.hash
     }
   }
 

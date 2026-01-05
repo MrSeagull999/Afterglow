@@ -11,6 +11,7 @@ import {
   getThumbnailPath
 } from '../shared/moduleRunner'
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../shared/guardrails'
+import { PromptAssembler } from '../../services/prompt/promptAssembler'
 
 export interface TwilightParams {
   jobId: string
@@ -38,9 +39,17 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
   }
 
   const guardrailIds = getDefaultGuardrailIds('twilight')
-  const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
+  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
 
-  const fullPrompt = [params.promptTemplate, guardrailPrompt].filter(Boolean).join(' ')
+  // Use PromptAssembler for consistent prompt building and hash generation
+  const assembled = PromptAssembler.assemble({
+    module: 'twilight',
+    basePrompt: params.promptTemplate,
+    injectorPrompts: [],
+    guardrailPrompts
+  })
+  
+  const fullPrompt = assembled.finalPrompt
 
   const recipe: VersionRecipe = {
     basePrompt: params.promptTemplate,
@@ -50,7 +59,8 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
       inputPath,
       presetId: params.presetId,
       lightingCondition: params.lightingCondition,
-      fullPrompt
+      fullPrompt,
+      promptHash: assembled.hash
     }
   }
 

@@ -1,14 +1,17 @@
 import { readFile, mkdir } from 'fs/promises'
-import { join, dirname } from 'path'
+import { join, dirname, basename } from 'path'
 import { existsSync } from 'fs'
 import sharp from 'sharp'
-import { generateImageWithGemini, generateSeed, ImageModel } from '../../gemini/geminiClient'
+import { generateSeed } from '../../gemini/geminiClient'
 import { getSettings } from '../../settings'
 import { saveImageWithExifHandling } from '../../exif'
 import type { Version, ModuleType } from '../../../../shared/types'
 import { getVersion, setVersionStatus, setVersionOutput } from '../../store/versionStore'
 import { getAsset } from '../../store/assetStore'
 import { getJobDirectory } from '../../store/jobStore'
+import { getImageProvider } from '../../providers/providerRouter'
+import { generationLogger } from '../../services/generation/generationLogger'
+import { PromptAssembler } from '../../services/prompt/promptAssembler'
 
 export interface GenerateResult {
   success: boolean
@@ -77,22 +80,74 @@ export async function generateVersionPreview(
       seed = generateSeed()
     }
 
-    const model = (version.model || settings.previewModel) as ImageModel
+    // Use configured model or fall back to settings
+    const model = version.model || settings.previewImageModel || settings.previewModel
 
     onProgress?.(40)
 
-    console.log(`[GenerateService] Generating ${version.module} preview for version ${versionId}`)
+    // PRIVACY GUARANTEE: Log only jobId and assetId, never filenames
+    console.log(`[GenerateService] Generating ${version.module} preview for job:${jobId} asset:${asset.id} version:${versionId}`)
+    console.log(`[GenerateService] Using model: ${model}`)
+    console.log(`[GenerateService] Provider: ${settings.imageProvider || 'google'}`)
 
-    const response = await generateImageWithGemini({
+    // Get provider and generate image
+    const provider = await getImageProvider()
+    const promptHash = PromptAssembler.generateHash(fullPrompt)
+    console.log(`[GenerateService] Prompt hash: ${promptHash}`)
+    
+    // RUNTIME ASSERTION: Verify prompt hash matches what was stored in recipe
+    // This ensures preview == payload (what user sees is what gets sent)
+    const storedHash = version.recipe.settings.promptHash as string | undefined
+    if (storedHash && storedHash !== promptHash) {
+      console.error(`[GenerateService] HASH MISMATCH DETECTED!`)
+      console.error(`[GenerateService] Stored hash: ${storedHash}`)
+      console.error(`[GenerateService] Computed hash: ${promptHash}`)
+      console.error(`[GenerateService] This indicates preview != payload - INVESTIGATE IMMEDIATELY`)
+      // Log to generation logger for visibility
+      generationLogger.log({
+        timestamp: new Date().toISOString(),
+        jobId,
+        versionId,
+        provider: settings.imageProvider || 'google',
+        model,
+        endpoint: 'HASH_MISMATCH_ERROR',
+        promptHash: `MISMATCH: stored=${storedHash} computed=${promptHash}`,
+        module: version.module,
+        success: false,
+        error: 'Preview hash does not match payload hash - prompt integrity violation'
+      })
+    }
+    
+    const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
       mimeType,
       model,
       imageSize: '1024x1024',
-      seed
+      seed,
+      priorityMode: settings.previewPriorityMode && settings.imageProvider === 'openrouter'
     })
 
     onProgress?.(80)
+
+    // Log generation attempt
+    const providerName = settings.imageProvider || 'google'
+    const endpoint = providerName === 'openrouter' 
+      ? `${process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'}/chat/completions`
+      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+    
+    generationLogger.log({
+      timestamp: new Date().toISOString(),
+      jobId,
+      versionId,
+      provider: providerName,
+      model,
+      endpoint,
+      promptHash,
+      module: version.module,
+      success: response.success,
+      error: response.error
+    })
 
     if (!response.success || !response.imageData) {
       await setVersionStatus(jobId, versionId, 'error', response.error || 'Generation failed')
@@ -210,19 +265,22 @@ export async function generateVersionHQPreview(
     const fullPrompt = version.recipe.settings.fullPrompt as string || version.recipe.basePrompt
 
     const seed = version.seed ?? null
-    const model = ((settings as any).hqPreviewModel || settings.previewModel) as ImageModel
+    const model = (settings as any).hqPreviewModel || settings.previewImageModel || settings.previewModel
 
     onProgress?.(40)
 
-    console.log(`[GenerateService] Generating ${version.module} HQ preview for version ${versionId}`)
+    // PRIVACY GUARANTEE: Log only jobId and assetId
+    console.log(`[GenerateService] Generating ${version.module} HQ preview for job:${jobId} asset:${asset.id} version:${versionId}`)
 
-    const response = await generateImageWithGemini({
+    const provider = await getImageProvider()
+    const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
       mimeType,
       model,
       imageSize: '1536x1536',
-      seed
+      seed,
+      priorityMode: settings.previewPriorityMode && settings.imageProvider === 'openrouter'
     })
 
     onProgress?.(80)
@@ -337,19 +395,22 @@ export async function generateVersionFinal(
 
     // Use same seed as preview if available
     const seed = version.seed ?? null
-    const model = (settings.finalModel || 'gemini-3-pro-image-preview') as ImageModel
+    const model = settings.advancedCustomModel || settings.finalModel || 'gemini-3-pro-image-preview'
 
     onProgress?.(40)
 
-    console.log(`[GenerateService] Generating ${version.module} final for version ${versionId}`)
+    // PRIVACY GUARANTEE: Log only jobId and assetId
+    console.log(`[GenerateService] Generating ${version.module} final for job:${jobId} asset:${asset.id} version:${versionId}`)
 
-    const response = await generateImageWithGemini({
+    const provider = await getImageProvider()
+    const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
       mimeType,
       model,
       imageSize: '2048x2048',
-      seed
+      seed,
+      priorityMode: false // Finals don't use priority mode
     })
 
     onProgress?.(80)

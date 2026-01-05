@@ -13,7 +13,8 @@ import {
   ChevronUp,
   Sparkles,
   FileText,
-  Star
+  Star,
+  FolderOpen
 } from 'lucide-react'
 
 interface ModuleGridTileProps {
@@ -66,14 +67,17 @@ export function ModuleGridTile({
   const [thumbnail, setThumbnail] = useState<string | null>(null)
   const [isRetrying, setIsRetrying] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
 
   // Load thumbnail
   useEffect(() => {
     async function loadThumbnail() {
       try {
-        // Use latest version thumbnail if available, else original
+        // Use selected version, latest version, or original
+        const selectedVersion = selectedVersionId ? versions.find(v => v.id === selectedVersionId) : null
         const latestVersion = getLatestVersion()
-        const path = latestVersion?.outputPath || asset.originalPath
+        const displayVersion = selectedVersion || latestVersion
+        const path = displayVersion?.outputPath || asset.originalPath
         const dataUrl = await window.electronAPI.readImageAsDataURL(path)
         if (dataUrl) setThumbnail(dataUrl)
       } catch (error) {
@@ -81,7 +85,7 @@ export function ModuleGridTile({
       }
     }
     loadThumbnail()
-  }, [asset.originalPath, versions])
+  }, [asset.originalPath, versions, selectedVersionId])
 
   // Get versions filtered by active module
   const getRelevantVersions = () => {
@@ -98,6 +102,14 @@ export function ModuleGridTile({
     )[0]
   }
 
+  // Get the currently displayed version (selected or latest)
+  const getDisplayedVersion = (): Version | null => {
+    if (selectedVersionId) {
+      return versions.find(v => v.id === selectedVersionId) || null
+    }
+    return getLatestVersion()
+  }
+
   // Get current status
   const getCurrentStatus = (): VersionStatus | 'original' => {
     const latest = getLatestVersion()
@@ -105,6 +117,7 @@ export function ModuleGridTile({
   }
 
   const latestVersion = getLatestVersion()
+  const displayedVersion = getDisplayedVersion()
   const currentStatus = getCurrentStatus()
   const statusConfig = STATUS_CONFIG[currentStatus]
   const isGenerating = currentStatus === 'generating' || currentStatus === 'hq_generating' || currentStatus === 'final_generating'
@@ -171,6 +184,22 @@ export function ModuleGridTile({
     }
   }
 
+  const handleShowInFinder = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const version = displayedVersion || latestVersion
+    const path = version?.outputPath || asset.originalPath
+    
+    try {
+      await window.api.invoke('file:showInFinder', path)
+    } catch (error) {
+      addToast('Failed to show in Finder', 'error')
+    }
+  }
+
+  const handleSelectVersion = (versionId: string) => {
+    setSelectedVersionId(versionId === selectedVersionId ? null : versionId)
+  }
+
   // Grid view
   if (viewMode === 'grid') {
     return (
@@ -198,17 +227,18 @@ export function ModuleGridTile({
             )}
 
             {/* Generating overlay */}
-            {isGenerating && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            {isGenerating && latestVersion && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <div className="text-center px-4 w-full">
                   <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto" />
-                  <span className="text-xs text-white mt-2 block">
-                    {currentStatus === 'final_generating' ? 'Generating Final...' : 'Processing...'}
+                  <span className="text-xs text-white mt-2 block font-medium">
+                    {currentStatus === 'final_generating' ? 'Generating Final...' : 
+                     currentStatus === 'hq_generating' ? 'Generating HQ...' : 'Processing...'}
                   </span>
-                  {latestVersion && versionProgress[latestVersion.id] !== undefined && (
-                    <div className="mt-2">
-                      <div className="text-xs text-white mb-1">{versionProgress[latestVersion.id]}%</div>
-                      <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  {versionProgress[latestVersion.id] !== undefined && (
+                    <div className="mt-2 px-2">
+                      <div className="text-xs text-white mb-1 font-medium">{Math.round(versionProgress[latestVersion.id])}%</div>
+                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-blue-500 transition-all duration-300"
                           style={{ width: `${versionProgress[latestVersion.id]}%` }}
@@ -240,19 +270,6 @@ export function ModuleGridTile({
                 {latestVersion.module}
               </div>
             )}
-
-            {/* Hover actions */}
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {latestVersion?.outputPath && (
-                <button
-                  onClick={handleCompare}
-                  className="p-1.5 bg-black/60 hover:bg-black/80 rounded-full"
-                  title="Compare"
-                >
-                  <Eye className="w-4 h-4 text-white" />
-                </button>
-              )}
-            </div>
 
             {/* Version count indicator */}
             {versions.length > 1 && (
@@ -329,7 +346,7 @@ export function ModuleGridTile({
         {/* Expanded version history */}
         {isExpanded && versions.length > 0 && (
           <div className="mt-2 p-2 bg-slate-800/50 rounded-lg border border-slate-700">
-            <div className="text-xs text-slate-400 mb-2">Version History</div>
+            <div className="text-xs text-slate-400 mb-2">Version History (click to view)</div>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {[...versions]
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -338,6 +355,8 @@ export function ModuleGridTile({
                     key={version.id} 
                     version={version} 
                     isLatest={version.id === latestVersion?.id}
+                    isSelected={version.id === selectedVersionId}
+                    onClick={() => handleSelectVersion(version.id)}
                   />
                 ))
               }
@@ -427,23 +446,45 @@ export function ModuleGridTile({
   )
 }
 
-function VersionHistoryItem({ version, isLatest }: { version: Version; isLatest: boolean }) {
+function VersionHistoryItem({ 
+  version, 
+  isLatest, 
+  isSelected,
+  onClick 
+}: { 
+  version: Version; 
+  isLatest: boolean;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
   const statusConfig = STATUS_CONFIG[version.status]
   
   return (
-    <div className={`flex items-center gap-2 p-1.5 rounded ${isLatest ? 'bg-slate-700/50' : 'hover:bg-slate-700/30'}`}>
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 p-1.5 rounded transition-colors ${
+        isSelected 
+          ? 'bg-blue-600/50 ring-1 ring-blue-500' 
+          : isLatest 
+          ? 'bg-slate-700/50 hover:bg-slate-700' 
+          : 'hover:bg-slate-700/30'
+      }`}
+    >
       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-white ${MODULE_COLORS[version.module]}`}>
         {version.module}
       </span>
       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-white ${statusConfig.color}`}>
         {statusConfig.label}
       </span>
-      <span className="text-[10px] text-slate-500 flex-1">
+      <span className="text-[10px] text-slate-400 flex-1 text-left">
         {new Date(version.createdAt).toLocaleString()}
       </span>
-      {isLatest && (
+      {isLatest && !isSelected && (
         <Star className="w-3 h-3 text-amber-400" />
       )}
-    </div>
+      {isSelected && (
+        <Eye className="w-3 h-3 text-blue-400" />
+      )}
+    </button>
   )
 }

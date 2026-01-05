@@ -37,17 +37,6 @@ export function TopBar() {
       {/* Navigation Tabs */}
       <div className="flex items-center gap-1 ml-8 no-drag">
         <button
-          onClick={() => setView('home')}
-          className={`px-3 py-1.5 text-sm rounded transition-colors ${
-            view === 'home' || view === 'run'
-              ? 'bg-slate-700 text-white'
-              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-          }`}
-        >
-          <Moon className="w-4 h-4 inline mr-1.5" />
-          Twilight
-        </button>
-        <button
           onClick={() => setView('jobs')}
           className={`px-3 py-1.5 text-sm rounded transition-colors ${
             view === 'jobs' || view === 'job'
@@ -57,6 +46,17 @@ export function TopBar() {
         >
           <Briefcase className="w-4 h-4 inline mr-1.5" />
           Studio
+        </button>
+        <button
+          onClick={() => setView('home')}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            view === 'home' || view === 'run'
+              ? 'bg-slate-700 text-white'
+              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`}
+        >
+          <Moon className="w-4 h-4 inline mr-1.5" />
+          Twilight
         </button>
       </div>
 

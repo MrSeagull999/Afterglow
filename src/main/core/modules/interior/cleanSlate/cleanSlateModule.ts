@@ -13,6 +13,7 @@ import {
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
 import { buildCleanSlatePrompt } from './cleanSlatePrompts'
+import { PromptAssembler } from '../../../services/prompt/promptAssembler'
 
 export interface CleanSlateParams {
   jobId: string
@@ -48,13 +49,19 @@ export async function generateCleanSlatePreview(params: CleanSlateParams): Promi
   const basePrompt = buildCleanSlatePrompt()
   const customInstructions = params.customInstructions?.trim() || ''
   
-  // Assemble full prompt: base + injectors + custom instructions + guardrails
-  const fullPrompt = [
+  // Use PromptAssembler for consistent prompt building and hash generation
+  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
+  const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
+  
+  const assembled = PromptAssembler.assemble({
+    module: 'clean',
     basePrompt,
-    injectorPrompt,
-    customInstructions ? `Additional removal requirements: ${customInstructions}` : '',
-    guardrailPrompt
-  ].filter(Boolean).join(' ')
+    injectorPrompts,
+    guardrailPrompts,
+    customInstructions
+  })
+  
+  const fullPrompt = assembled.finalPrompt
 
   const recipe: VersionRecipe = {
     basePrompt,
@@ -63,7 +70,8 @@ export async function generateCleanSlatePreview(params: CleanSlateParams): Promi
     settings: {
       inputPath,
       customInstructions,
-      fullPrompt
+      fullPrompt,
+      promptHash: assembled.hash
     }
   }
 

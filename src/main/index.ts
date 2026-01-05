@@ -16,6 +16,7 @@ console.log('Loading .env from:', envPath)
 console.log('GEMINI_API_KEY configured:', !!process.env.GEMINI_API_KEY)
 
 let mainWindow: BrowserWindow | null = null
+let handlersRegistered = false
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -34,10 +35,20 @@ function createWindow(): void {
   })
 
   setupIpcHandlers(mainWindow)
-  registerAllHandlers() // Phase 2 handlers
+  
+  // Register handlers only once
+  if (!handlersRegistered) {
+    registerAllHandlers() // Phase 2 handlers
+    handlersRegistered = true
+  }
 
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:5173')
+  if (!app.isPackaged) {
+    const devUrl =
+      process.env.VITE_DEV_SERVER_URL ||
+      process.env.ELECTRON_RENDERER_URL ||
+      'http://localhost:5173'
+    console.log('[Main] Loading renderer dev URL:', devUrl)
+    mainWindow.loadURL(devUrl)
     mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))

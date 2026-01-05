@@ -1,8 +1,14 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { loadInjectorsForModule, reloadInjectors } from '../core/modules/shared/injectorRegistry'
-import { getGuardrailsForModule, ARCHITECTURAL_GUARDRAILS } from '../core/modules/shared/guardrails'
+import { getGuardrailsForModule, ARCHITECTURAL_GUARDRAILS, buildGuardrailPrompt } from '../core/modules/shared/guardrails'
 import { generateVersionPreview, generateVersionHQPreview, generateVersionFinal } from '../core/modules/shared/generateService'
 import type { ModuleType } from '../../shared/types'
+import { PromptAssembler } from '../core/services/prompt/promptAssembler'
+import { buildInjectorPromptFromIds } from '../core/modules/shared/injectorRegistry'
+import { buildStagingPrompt } from '../core/modules/interior/staging/stagingPrompts'
+import { buildCleanSlatePrompt } from '../core/modules/interior/cleanSlate/cleanSlatePrompts'
+import { buildRenovatePrompt, RenovateChanges } from '../core/modules/interior/renovate/renovatePrompts'
+import { generationLogger } from '../core/services/generation/generationLogger'
 
 import {
   generateCleanSlatePreview,
@@ -327,5 +333,75 @@ export function registerModuleHandlers(): void {
 
   ipcMain.handle('constants:getCurtainStyles', async () => {
     return CURTAIN_STYLES
+  })
+
+  // Prompt assembly handler - supports ALL modules
+  ipcMain.handle('prompt:assemblePhase2', async (_event, params: {
+    module: string
+    roomType?: string
+    style?: string
+    changes?: RenovateChanges
+    presetId?: string
+    lightingCondition?: 'overcast' | 'sunny'
+    injectorIds: string[]
+    guardrailIds: string[]
+    customInstructions?: string
+  }) => {
+    // Build base prompt based on module type
+    let basePrompt: string
+    const moduleType = params.module as ModuleType
+
+    switch (moduleType) {
+      case 'clean':
+        basePrompt = buildCleanSlatePrompt()
+        break
+      case 'stage':
+        basePrompt = buildStagingPrompt({
+          roomType: params.roomType,
+          style: params.style
+        })
+        break
+      case 'renovate':
+        basePrompt = params.changes 
+          ? buildRenovatePrompt(params.changes)
+          : 'Select renovation changes to see prompt preview.'
+        break
+      case 'twilight':
+        // Twilight uses preset templates - show a representative prompt
+        basePrompt = `Transform this daytime exterior photo into a stunning twilight/dusk scene. The sky should show deep blue hour colors with warm orange and pink tones near the horizon. All interior lights should be warmly lit, glowing invitingly through windows. Exterior landscape lighting should be on. Maintain all architectural details exactly as shown.${params.lightingCondition === 'sunny' ? ' Account for strong shadows from direct sunlight in the original.' : ''}`
+        break
+      default:
+        basePrompt = 'Unknown module type'
+    }
+
+    const injectorPrompt = await buildInjectorPromptFromIds(moduleType, params.injectorIds)
+    const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
+    
+    const guardrailPrompts = params.guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
+
+    const assembled = PromptAssembler.assemble({
+      module: params.module,
+      basePrompt,
+      injectorPrompts,
+      guardrailPrompts,
+      customInstructions: params.customInstructions,
+      roomType: params.roomType,
+      style: params.style
+    })
+
+    return {
+      finalPrompt: assembled.finalPrompt,
+      hash: assembled.hash,
+      metadata: assembled.metadata
+    }
+  })
+
+  // Debug handlers
+  ipcMain.handle('debug:getLastLog', async () => {
+    return generationLogger.getLastLog()
+  })
+
+  ipcMain.handle('debug:getRecentLogs', async (_event, count: number = 10) => {
+    return generationLogger.getRecentLogs(count)
   })
 }

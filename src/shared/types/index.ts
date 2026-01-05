@@ -66,6 +66,12 @@ export interface Asset {
   versionIds: string[]
   createdAt: string
   updatedAt: string
+  
+  // Filename sanitization (privacy protection)
+  displayName?: string        // Original filename for UI display
+  originalName?: string        // Original filename for reference (never sent to providers)
+  sanitizedName?: string       // Safe filename used for storage and API calls
+  legacySanitized?: boolean    // True if sanitizedName was set from existing filename during migration
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import type { ModuleType, VersionStatus } from '../../shared/types'
 import {
   queryLibrary,
@@ -43,5 +43,9 @@ export function registerLibraryHandlers(): void {
 
   ipcMain.handle('library:getJobStats', async (_event, jobId: string) => {
     return getJobStats(jobId)
+  })
+
+  ipcMain.handle('file:showInFinder', async (_event, filePath: string) => {
+    shell.showItemInFolder(filePath)
   })
 }

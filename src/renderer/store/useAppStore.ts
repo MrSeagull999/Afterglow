@@ -74,6 +74,15 @@ export interface Settings {
   seedStrategy: SeedStrategy
   fixedRunSeed: number | null
   defaultLightingCondition: LightingCondition
+  
+  // Provider settings
+  imageProvider?: 'google' | 'openrouter'
+  previewImageModel?: string
+  previewPriorityMode?: boolean
+  advancedCustomModel?: string
+  privacy?: {
+    safeFilenamesOnImport: boolean
+  }
 }
 
 export interface CostEstimate {
@@ -137,7 +146,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  view: 'home',
+  view: 'jobs',
   currentRunId: null,
   currentRun: null,
   runs: [],

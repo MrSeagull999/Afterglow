@@ -8,6 +8,7 @@ import {
   Loader2,
   Info
 } from 'lucide-react'
+import { GenerationControlFooter } from './GenerationControlFooter'
 
 export function RenovatePanel() {
   const {
@@ -95,6 +96,9 @@ export function RenovatePanel() {
 
       addToast('Renovate generation started', 'success')
       await loadVersionsForAsset(currentJob.id, currentAsset.id)
+      
+      // Trigger immediate UI refresh
+      window.dispatchEvent(new CustomEvent('versionsUpdated', { detail: { assetId: currentAsset.id } }))
     } catch (error) {
       console.error('Failed to generate:', error)
       addToast('Failed to start generation', 'error')
@@ -255,6 +259,9 @@ export function RenovatePanel() {
           </div>
         )}
       </div>
+
+      {/* Generation Control Footer - Custom Instructions + Prompt Preview */}
+      <GenerationControlFooter module="renovate" />
 
       {/* Generate Button */}
       <button

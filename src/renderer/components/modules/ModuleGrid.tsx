@@ -88,6 +88,15 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
     loadAllVersions()
   }, [loadAllVersions])
 
+  // Listen for manual version updates (e.g., when generation starts)
+  useEffect(() => {
+    const handleVersionsUpdated = () => {
+      loadAllVersions()
+    }
+    window.addEventListener('versionsUpdated', handleVersionsUpdated)
+    return () => window.removeEventListener('versionsUpdated', handleVersionsUpdated)
+  }, [loadAllVersions])
+
   // Get the latest version status for an asset
   const getAssetStatus = useCallback((asset: Asset): VersionStatus | 'original' => {
     const versions = assetVersions.get(asset.id) || []

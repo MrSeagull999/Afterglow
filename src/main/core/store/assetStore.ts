@@ -4,10 +4,13 @@ import { existsSync } from 'fs'
 import type { Asset } from '../../../shared/types'
 import { getJobDirectory } from './jobStore'
 import { addAssetToScene, removeAssetFromScene } from './sceneStore'
+import { generateAssetId as generateSequentialAssetId, generateSanitizedFilename, getDisplayName } from '../utils/filenameSanitizer'
+import { getSettings } from '../settings'
 
-function generateAssetId(): string {
-  const random = Math.random().toString(36).slice(2, 10)
-  return `asset_${random}`
+async function generateAssetId(jobId: string): Promise<string> {
+  // Count existing assets to generate sequential ID
+  const assets = await listAssetsForJob(jobId)
+  return generateSequentialAssetId(assets.length)
 }
 
 function getAssetPath(jobId: string, assetId: string): string {
@@ -21,19 +24,36 @@ export async function createAsset(params: {
   sourcePath?: string  // Optional - for import via path
   originalPath?: string  // Optional - for direct path reference
 }): Promise<Asset> {
-  const assetId = generateAssetId()
+  const assetId = await generateAssetId(params.jobId)
   const jobDir = getJobDirectory(params.jobId)
+  const settings = await getSettings()
 
   let finalOriginalPath: string
+  let originalFilename: string
+  let sanitizedFilename: string
+  let displayName: string
 
   if (params.sourcePath) {
-    const ext = extname(params.sourcePath)
-    const originalFilename = `${assetId}${ext}`
-    finalOriginalPath = join(jobDir, 'originals', originalFilename)
+    // Get original filename from source
+    originalFilename = basename(params.sourcePath)
+    displayName = getDisplayName(originalFilename)
+    
+    // Generate sanitized filename for storage
+    // Format: {jobId}_{assetId}_source.{ext}
+    sanitizedFilename = generateSanitizedFilename(params.jobId, assetId, originalFilename)
+    
+    // Save file using sanitized name
+    finalOriginalPath = join(jobDir, 'originals', sanitizedFilename)
     await copyFile(params.sourcePath, finalOriginalPath)
+    
+    console.log(`[AssetStore] Created asset with sanitized filename: ${sanitizedFilename}`)
+    console.log(`[AssetStore] Original filename stored as metadata only: ${originalFilename}`)
   } else if (params.originalPath) {
     // Direct path reference (already exists)
     finalOriginalPath = params.originalPath
+    originalFilename = basename(params.originalPath)
+    displayName = getDisplayName(originalFilename)
+    sanitizedFilename = generateSanitizedFilename(params.jobId, assetId, originalFilename)
   } else {
     throw new Error('Either sourcePath or originalPath must be provided')
   }
@@ -42,11 +62,17 @@ export async function createAsset(params: {
     id: assetId,
     jobId: params.jobId,
     sceneId: params.sceneId,  // Can be undefined
-    name: params.name || basename(params.sourcePath || params.originalPath || '', extname(params.sourcePath || params.originalPath || '')),
+    name: params.name || displayName,
     originalPath: finalOriginalPath,
     versionIds: [],
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    
+    // Privacy-protected filename metadata
+    displayName: displayName,           // Show in UI
+    originalName: originalFilename,     // Store for reference, never send to providers
+    sanitizedName: sanitizedFilename,   // Use for all external API calls
+    legacySanitized: false              // This is a new asset with proper sanitization
   }
 
   const assetPath = getAssetPath(params.jobId, assetId)

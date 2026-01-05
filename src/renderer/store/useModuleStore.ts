@@ -58,17 +58,20 @@ interface ModuleState {
     isMasterView: boolean
     masterVersionId: string | null
     furnitureSpecId: string | null
+    customInstructions: string
   }
 
   renovateSettings: {
     sourceVersionId: string | null
     changes: RenovateChanges
+    customInstructions: string
   }
 
   twilightSettings: {
     sourceVersionId: string | null
     presetId: string
     lightingCondition: 'overcast' | 'sunny'
+    customInstructions: string
   }
 
   // Generation state
@@ -104,15 +107,18 @@ interface ModuleState {
   setStagingIsMasterView: (isMaster: boolean) => void
   setStagingMasterVersion: (versionId: string | null) => void
   setStagingFurnitureSpec: (specId: string | null) => void
+  setStagingCustomInstructions: (instructions: string) => void
 
   // Renovate
   setRenovateSourceVersion: (versionId: string | null) => void
   setRenovateChanges: (changes: RenovateChanges) => void
+  setRenovateCustomInstructions: (instructions: string) => void
 
   // Twilight
   setTwilightSourceVersion: (versionId: string | null) => void
   setTwilightPresetId: (presetId: string) => void
   setTwilightLightingCondition: (condition: 'overcast' | 'sunny') => void
+  setTwilightCustomInstructions: (instructions: string) => void
 
   // Generation
   setIsGenerating: (isGenerating: boolean) => void
@@ -161,18 +167,21 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
     style: 'modern contemporary',
     isMasterView: true,
     masterVersionId: null,
-    furnitureSpecId: null
+    furnitureSpecId: null,
+    customInstructions: ''
   },
 
   renovateSettings: {
     sourceVersionId: null,
-    changes: defaultRenovateChanges
+    changes: defaultRenovateChanges,
+    customInstructions: ''
   },
 
   twilightSettings: {
     sourceVersionId: null,
     presetId: 'twilight_exterior_classic',
-    lightingCondition: 'overcast'
+    lightingCondition: 'overcast',
+    customInstructions: ''
   },
 
   isGenerating: false,
@@ -281,6 +290,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       stagingSettings: { ...state.stagingSettings, furnitureSpecId: specId }
     })),
 
+  setStagingCustomInstructions: (instructions) =>
+    set((state) => ({
+      stagingSettings: { ...state.stagingSettings, customInstructions: instructions }
+    })),
+
   // Renovate
   setRenovateSourceVersion: (versionId) =>
     set((state) => ({
@@ -290,6 +304,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
   setRenovateChanges: (changes) =>
     set((state) => ({
       renovateSettings: { ...state.renovateSettings, changes }
+    })),
+
+  setRenovateCustomInstructions: (instructions) =>
+    set((state) => ({
+      renovateSettings: { ...state.renovateSettings, customInstructions: instructions }
     })),
 
   // Twilight
@@ -306,6 +325,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
   setTwilightLightingCondition: (condition) =>
     set((state) => ({
       twilightSettings: { ...state.twilightSettings, lightingCondition: condition }
+    })),
+
+  setTwilightCustomInstructions: (instructions) =>
+    set((state) => ({
+      twilightSettings: { ...state.twilightSettings, customInstructions: instructions }
     })),
 
   // Generation
@@ -343,16 +367,19 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         style: 'modern contemporary',
         isMasterView: true,
         masterVersionId: null,
-        furnitureSpecId: null
+        furnitureSpecId: null,
+        customInstructions: ''
       },
       renovateSettings: {
         sourceVersionId: null,
-        changes: defaultRenovateChanges
+        changes: defaultRenovateChanges,
+        customInstructions: ''
       },
       twilightSettings: {
         sourceVersionId: null,
         presetId: 'twilight_exterior_classic',
-        lightingCondition: 'overcast'
+        lightingCondition: 'overcast',
+        customInstructions: ''
       },
       isGenerating: false,
       generatingVersionId: null

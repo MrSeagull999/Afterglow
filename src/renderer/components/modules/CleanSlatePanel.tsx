@@ -9,6 +9,7 @@ import {
   Check,
   Info
 } from 'lucide-react'
+import { GenerationControlFooter } from './GenerationControlFooter'
 
 export function CleanSlatePanel() {
   const {
@@ -53,6 +54,9 @@ export function CleanSlatePanel() {
 
       addToast('Clean Slate generation started', 'success')
       await loadVersionsForAsset(currentJob.id, currentAsset.id)
+      
+      // Trigger immediate UI refresh
+      window.dispatchEvent(new CustomEvent('versionsUpdated', { detail: { assetId: currentAsset.id } }))
     } catch (error) {
       console.error('Failed to generate:', error)
       addToast('Failed to start generation', 'error')
@@ -97,23 +101,6 @@ export function CleanSlatePanel() {
             <span className="text-slate-400">Original image (or select from Library)</span>
           )}
         </div>
-      </div>
-
-      {/* Custom Instructions */}
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Additional Removal Instructions (Optional)
-        </label>
-        <textarea
-          value={cleanSlateSettings.customInstructions}
-          onChange={(e) => setCleanSlateCustomInstructions(e.target.value)}
-          placeholder="e.g., Remove the two pot plants near the window.&#10;Remove fireplace tools and baskets.&#10;Remove chairs but keep the table."
-          rows={4}
-          className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
-        />
-        <p className="text-xs text-slate-500 mt-1">
-          Use this to manually specify objects that should be removed if the automatic removal misses them.
-        </p>
       </div>
 
       {/* Injectors */}
@@ -166,6 +153,9 @@ export function CleanSlatePanel() {
           ))}
         </div>
       </div>
+
+      {/* Generation Control Footer - Custom Instructions + Prompt Preview */}
+      <GenerationControlFooter module="clean" />
 
       {/* Generate Button */}
       <button

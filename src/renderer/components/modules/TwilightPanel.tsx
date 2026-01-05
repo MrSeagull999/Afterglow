@@ -10,6 +10,7 @@ import {
   Cloud,
   Info
 } from 'lucide-react'
+import { GenerationControlFooter } from './GenerationControlFooter'
 
 export function TwilightPanel() {
   const {
@@ -72,6 +73,9 @@ export function TwilightPanel() {
 
       addToast('Twilight generation started', 'success')
       await loadVersionsForAsset(currentJob.id, currentAsset.id)
+      
+      // Trigger immediate UI refresh
+      window.dispatchEvent(new CustomEvent('versionsUpdated', { detail: { assetId: currentAsset.id } }))
     } catch (error) {
       console.error('Failed to generate:', error)
       addToast('Failed to start generation', 'error')
@@ -201,6 +205,9 @@ export function TwilightPanel() {
           </div>
         </div>
       )}
+
+      {/* Generation Control Footer - Custom Instructions + Prompt Preview */}
+      <GenerationControlFooter module="twilight" />
 
       {/* Generate Button */}
       <button

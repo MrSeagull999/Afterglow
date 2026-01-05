@@ -9,6 +9,7 @@ import {
   Star,
   Info
 } from 'lucide-react'
+import { GenerationControlFooter } from './GenerationControlFooter'
 
 export function StagingPanel() {
   const {
@@ -70,11 +71,15 @@ export function StagingPanel() {
         roomType: stagingSettings.roomType,
         style: stagingSettings.style,
         injectorIds: Array.from(selectedInjectorIds),
-        customGuardrails: Array.from(selectedGuardrailIds)
+        customGuardrails: Array.from(selectedGuardrailIds),
+        customInstructions: stagingSettings.customInstructions
       })
 
       addToast('Staging generation started', 'success')
       await loadVersionsForAsset(currentJob.id, currentAsset.id)
+      
+      // Trigger immediate UI refresh
+      window.dispatchEvent(new CustomEvent('versionsUpdated', { detail: { assetId: currentAsset.id } }))
     } catch (error) {
       console.error('Failed to generate:', error)
       addToast('Failed to start generation', 'error')
@@ -212,6 +217,9 @@ export function StagingPanel() {
           ))}
         </div>
       </div>
+
+      {/* Generation Control Footer - Custom Instructions + Prompt Preview */}
+      <GenerationControlFooter module="stage" />
 
       {/* Generate Button */}
       <button

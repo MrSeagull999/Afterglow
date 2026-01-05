@@ -14,6 +14,7 @@ import {
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
 import { buildStagingPrompt, buildSecondaryAnglePrompt } from './stagingPrompts'
+import { PromptAssembler } from '../../../services/prompt/promptAssembler'
 
 export interface StagingParams {
   jobId: string
@@ -23,6 +24,7 @@ export interface StagingParams {
   style?: string
   injectorIds?: string[]
   customGuardrails?: string[]
+  customInstructions?: string
   model?: string
   seed?: number | null
 }
@@ -54,14 +56,26 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
   const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
   const injectorIds = params.injectorIds || []
 
-  const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
+  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
   const injectorPrompt = await buildInjectorPromptFromIds('stage', injectorIds)
+  const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
 
   const basePrompt = buildStagingPrompt({
     roomType: params.roomType,
     style: params.style
   })
-  const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
+
+  const assembled = PromptAssembler.assemble({
+    module: 'stage',
+    basePrompt,
+    injectorPrompts,
+    guardrailPrompts,
+    customInstructions: params.customInstructions,
+    roomType: params.roomType,
+    style: params.style
+  })
+  
+  const fullPrompt = assembled.finalPrompt
 
   // Determine input path
   let inputPath: string
@@ -80,7 +94,9 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
       inputPath,
       roomType: params.roomType,
       style: params.style,
-      fullPrompt
+      customInstructions: params.customInstructions,
+      fullPrompt,
+      promptHash: assembled.hash
     }
   }
 
