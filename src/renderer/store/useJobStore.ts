@@ -1,5 +1,101 @@
 import { create } from 'zustand'
 import type { Job, Scene, Asset, Version, JobMetadata, ModuleType } from '../../shared/types'
+import { resolveGenerationStatus } from '../../shared/resolveGenerationStatus'
+
+export type BatchRun = {
+  id: string
+  moduleId: string
+  startedAt: number
+  assetIds: string[]
+  createdVersionIdsByAssetId: Record<string, string>
+  failedAssetIds?: string[]
+  dismissed?: boolean
+}
+
+export type BatchRunCounts = {
+  pending: number
+  completed: number
+  failed: number
+}
+
+let batchRunSeq = 0
+
+export function getBatchRunCounts(params: {
+  batchRun: BatchRun
+  versionsByAssetId: Record<string, Version[]>
+}): BatchRunCounts {
+  let pending = 0
+  let completed = 0
+  let failed = 0
+
+  const failedSet = new Set(params.batchRun.failedAssetIds || [])
+
+  for (const assetId of params.batchRun.assetIds) {
+    const createdId = params.batchRun.createdVersionIdsByAssetId[assetId]
+
+    if (!createdId) {
+      if (failedSet.has(assetId)) {
+        failed += 1
+      } else {
+        pending += 1
+      }
+      continue
+    }
+
+    const versions = params.versionsByAssetId[assetId] || []
+    const v = versions.find((x) => x.id === createdId)
+    if (!v) {
+      pending += 1
+      continue
+    }
+
+    const status = resolveGenerationStatus(v)
+    if (status === 'pending') pending += 1
+    else if (status === 'completed') completed += 1
+    else if (status === 'failed') failed += 1
+    else pending += 1
+  }
+
+  return { pending, completed, failed }
+}
+
+export function getNextBatchAssetIdByPredicate(params: {
+  batchRun: BatchRun
+  versionsByAssetId: Record<string, Version[]>
+  currentAssetId: string | null
+  predicate: (status: 'idle' | 'pending' | 'completed' | 'failed', assetId: string) => boolean
+}): string | null {
+  const ids = params.batchRun.assetIds
+  if (ids.length === 0) return null
+
+  const failedSet = new Set(params.batchRun.failedAssetIds || [])
+
+  const startIdx = (() => {
+    if (!params.currentAssetId) return -1
+    const idx = ids.indexOf(params.currentAssetId)
+    return idx >= 0 ? idx : -1
+  })()
+
+  for (let offset = 1; offset <= ids.length; offset++) {
+    const idx = (startIdx + offset + ids.length) % ids.length
+    const assetId = ids[idx]
+
+    const createdId = params.batchRun.createdVersionIdsByAssetId[assetId]
+    const status = (() => {
+      if (!createdId) {
+        if (failedSet.has(assetId)) return 'failed' as const
+        return 'pending' as const
+      }
+      const versions = params.versionsByAssetId[assetId] || []
+      const v = versions.find((x) => x.id === createdId)
+      return resolveGenerationStatus(v)
+    })()
+
+    if (params.predicate(status, assetId)) return assetId
+  }
+
+  return null
+}
 
 interface JobState {
   // Current job context
@@ -13,9 +109,19 @@ interface JobState {
   assets: Asset[]
   versions: Version[]
 
+  // Versions cache (per asset) for version-aware MainStage
+  versionsByAssetId: Record<string, Version[]>
+
+  // MainStage viewing state
+  viewedVersionIdByAssetId: Record<string, string | null>
+  lastAppliedVersionIdByAssetId: Record<string, string | null>
+
   // Selection state
   selectedAssetIds: Set<string>
   selectedVersionId: string | null
+
+  // Batch Run
+  activeBatchRun?: BatchRun
 
   // Loading states
   isLoadingJobs: boolean
@@ -62,6 +168,28 @@ interface JobState {
   duplicateVersion: (jobId: string, versionId: string, modifications?: { module?: ModuleType }) => Promise<Version>
   deletePreviewsExceptApproved: (jobId: string, assetId: string) => Promise<number>
 
+  // MainStage viewing helpers
+  getAssetVersions: (assetId: string) => Version[]
+  getAssetLatestVersion: (assetId: string) => Version | null
+  getViewedVersionId: (assetId: string) => string | null
+  setViewedVersionId: (assetId: string, versionId: string | null) => void
+  setLastAppliedVersionId: (assetId: string, versionId: string | null) => void
+  getLastAppliedVersionId: (assetId: string) => string | null
+
+  // Batch Run
+  startBatchRun: (params: {
+    moduleId: string
+    assetIds: string[]
+    createdVersionIdsByAssetId: Record<string, string>
+    failedAssetIds?: string[]
+  }) => void
+  dismissBatchRun: () => void
+  jumpToBatchAsset: (assetId: string) => void
+  jumpToNextFailedInBatchRun: () => void
+  jumpToNextPendingInBatchRun: () => void
+  jumpToNextCompletedInBatchRun: () => void
+  getActiveBatchRunCounts: () => BatchRunCounts | null
+
   // Reset
   resetJobContext: () => void
 }
@@ -75,8 +203,12 @@ export const useJobStore = create<JobState>((set, get) => ({
   scenes: [],
   assets: [],
   versions: [],
+  versionsByAssetId: {},
+  viewedVersionIdByAssetId: {},
+  lastAppliedVersionIdByAssetId: {},
   selectedAssetIds: new Set(),
   selectedVersionId: null,
+  activeBatchRun: undefined,
   isLoadingJobs: false,
   isLoadingScenes: false,
   isLoadingAssets: false,
@@ -247,7 +379,11 @@ export const useJobStore = create<JobState>((set, get) => ({
     set({ isLoadingVersions: true })
     try {
       const versions = await window.api.invoke('version:listForAsset', jobId, assetId)
-      set({ versions, isLoadingVersions: false })
+      set((state) => ({
+        versions,
+        versionsByAssetId: { ...state.versionsByAssetId, [assetId]: versions },
+        isLoadingVersions: false
+      }))
     } catch (error) {
       console.error('Failed to load versions:', error)
       set({ isLoadingVersions: false })
@@ -255,12 +391,25 @@ export const useJobStore = create<JobState>((set, get) => ({
   },
 
   approveVersion: async (jobId, versionId) => {
-    const updatedVersion = await window.api.invoke('version:approve', jobId, versionId)
-    if (updatedVersion) {
-      set((state) => ({
-        versions: state.versions.map((v) => (v.id === versionId ? updatedVersion : v))
-      }))
-    }
+    const updated = await window.api.invoke('version:approve', jobId, versionId)
+    if (!updated) return
+
+    const updatedVersions = Array.isArray(updated) ? updated : [updated]
+    set((state) => ({
+      versions: state.versions.map((v) => {
+        const match = updatedVersions.find((u) => u.id === v.id)
+        return match ? match : v
+      }),
+      versionsByAssetId: Object.fromEntries(
+        Object.entries(state.versionsByAssetId).map(([assetId, list]) => [
+          assetId,
+          list.map((v) => {
+            const match = updatedVersions.find((u) => u.id === v.id)
+            return match ? match : v
+          })
+        ])
+      )
+    }))
   },
 
   unapproveVersion: async (jobId, versionId) => {
@@ -277,7 +426,13 @@ export const useJobStore = create<JobState>((set, get) => ({
     if (deleted) {
       set((state) => ({
         versions: state.versions.filter((v) => v.id !== versionId),
-        selectedVersionId: state.selectedVersionId === versionId ? null : state.selectedVersionId
+        selectedVersionId: state.selectedVersionId === versionId ? null : state.selectedVersionId,
+        versionsByAssetId: Object.fromEntries(
+          Object.entries(state.versionsByAssetId).map(([assetId, list]) => [
+            assetId,
+            list.filter((v) => v.id !== versionId)
+          ])
+        )
       }))
     }
   },
@@ -296,6 +451,128 @@ export const useJobStore = create<JobState>((set, get) => ({
     return count
   },
 
+  getAssetVersions: (assetId) => {
+    return get().versionsByAssetId[assetId] || []
+  },
+
+  getAssetLatestVersion: (assetId) => {
+    const list = get().versionsByAssetId[assetId] || []
+    if (list.length === 0) return null
+    const sorted = [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return sorted[0] || null
+  },
+
+  getViewedVersionId: (assetId) => {
+    return get().viewedVersionIdByAssetId[assetId] || null
+  },
+
+  setViewedVersionId: (assetId, versionId) =>
+    set((state) => ({
+      viewedVersionIdByAssetId: { ...state.viewedVersionIdByAssetId, [assetId]: versionId }
+    })),
+
+  setLastAppliedVersionId: (assetId, versionId) =>
+    set((state) => ({
+      lastAppliedVersionIdByAssetId: { ...state.lastAppliedVersionIdByAssetId, [assetId]: versionId }
+    })),
+
+  getLastAppliedVersionId: (assetId) => {
+    return get().lastAppliedVersionIdByAssetId[assetId] || null
+  },
+
+  startBatchRun: (params) =>
+    set({
+      activeBatchRun: {
+        id: `${Date.now()}-${++batchRunSeq}`,
+        moduleId: params.moduleId,
+        startedAt: Date.now(),
+        assetIds: params.assetIds,
+        createdVersionIdsByAssetId: params.createdVersionIdsByAssetId,
+        failedAssetIds: params.failedAssetIds,
+        dismissed: false
+      }
+    }),
+
+  dismissBatchRun: () =>
+    set((state) => {
+      if (!state.activeBatchRun) return state
+      return { activeBatchRun: { ...state.activeBatchRun, dismissed: true } }
+    }),
+
+  jumpToBatchAsset: (assetId) =>
+    set((state) => {
+      const run = state.activeBatchRun
+      const versionId = run?.createdVersionIdsByAssetId?.[assetId]
+
+      if (!versionId) {
+        return {
+          selectedAssetIds: new Set([assetId])
+        }
+      }
+
+      return {
+        selectedAssetIds: new Set([assetId]),
+        viewedVersionIdByAssetId: {
+          ...state.viewedVersionIdByAssetId,
+          [assetId]: versionId
+        }
+      }
+    }),
+
+  jumpToNextFailedInBatchRun: () => {
+    const state = get()
+    const run = state.activeBatchRun
+    if (!run || run.dismissed) return
+
+    const currentAssetId = state.selectedAssetIds.size === 1 ? Array.from(state.selectedAssetIds)[0] : null
+    const next = getNextBatchAssetIdByPredicate({
+      batchRun: run,
+      versionsByAssetId: state.versionsByAssetId,
+      currentAssetId,
+      predicate: (status) => status === 'failed'
+    })
+    if (!next) return
+    state.jumpToBatchAsset(next)
+  },
+
+  jumpToNextPendingInBatchRun: () => {
+    const state = get()
+    const run = state.activeBatchRun
+    if (!run || run.dismissed) return
+
+    const currentAssetId = state.selectedAssetIds.size === 1 ? Array.from(state.selectedAssetIds)[0] : null
+    const next = getNextBatchAssetIdByPredicate({
+      batchRun: run,
+      versionsByAssetId: state.versionsByAssetId,
+      currentAssetId,
+      predicate: (status) => status === 'pending'
+    })
+    if (!next) return
+    state.jumpToBatchAsset(next)
+  },
+
+  jumpToNextCompletedInBatchRun: () => {
+    const state = get()
+    const run = state.activeBatchRun
+    if (!run || run.dismissed) return
+
+    const currentAssetId = state.selectedAssetIds.size === 1 ? Array.from(state.selectedAssetIds)[0] : null
+    const next = getNextBatchAssetIdByPredicate({
+      batchRun: run,
+      versionsByAssetId: state.versionsByAssetId,
+      currentAssetId,
+      predicate: (status) => status === 'completed'
+    })
+    if (!next) return
+    state.jumpToBatchAsset(next)
+  },
+
+  getActiveBatchRunCounts: () => {
+    const state = get()
+    if (!state.activeBatchRun || state.activeBatchRun.dismissed) return null
+    return getBatchRunCounts({ batchRun: state.activeBatchRun, versionsByAssetId: state.versionsByAssetId })
+  },
+
   // Reset
   resetJobContext: () =>
     set({
@@ -305,7 +582,11 @@ export const useJobStore = create<JobState>((set, get) => ({
       scenes: [],
       assets: [],
       versions: [],
+      versionsByAssetId: {},
+      viewedVersionIdByAssetId: {},
+      lastAppliedVersionIdByAssetId: {},
       selectedAssetIds: new Set(),
-      selectedVersionId: null
+      selectedVersionId: null,
+      activeBatchRun: undefined
     })
 }))

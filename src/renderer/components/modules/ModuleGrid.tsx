@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useJobStore } from '../../store/useJobStore'
 import { useModuleStore } from '../../store/useModuleStore'
 import { useAppStore } from '../../store/useAppStore'
+import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus'
 import { ModuleGridTile } from './ModuleGridTile'
 import { CompareModal } from './CompareModal'
 import type { Asset, Version, VersionStatus, ModuleType } from '../../../shared/types'
@@ -18,11 +19,12 @@ import {
 
 interface ModuleGridProps {
   activeModule: ModuleType | null
+  libraryMode?: boolean
 }
 
 type FilterStatus = 'all' | 'pending' | 'preview_ready' | 'approved' | 'final_ready' | 'error'
 
-export function ModuleGrid({ activeModule }: ModuleGridProps) {
+export function ModuleGrid({ activeModule, libraryMode = false }: ModuleGridProps) {
   const {
     currentJob,
     assets,
@@ -38,7 +40,7 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
   const { addToast } = useAppStore()
 
   const [filter, setFilter] = useState<FilterStatus>('all')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(libraryMode ? 'list' : 'grid')
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [assetVersions, setAssetVersions] = useState<Map<string, Version[]>>(new Map())
@@ -116,12 +118,25 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
     return sorted[0].status
   }, [assetVersions, activeModule])
 
+  const isAssetPending = useCallback(
+    (asset: Asset): boolean => {
+      const versions = assetVersions.get(asset.id) || []
+      if (versions.length === 0) return true
+
+      const relevantVersions = activeModule ? versions.filter((v) => v.module === activeModule) : versions
+      if (relevantVersions.length === 0) return true
+
+      const latest = [...relevantVersions].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+      return resolveGenerationStatus(latest) === 'pending'
+    },
+    [assetVersions, activeModule]
+  )
+
   // Filter assets based on their version status
   const filteredAssets = assets.filter(asset => {
     if (filter === 'all') return true
     if (filter === 'pending') {
-      const status = getAssetStatus(asset)
-      return status === 'original' || status === 'generating'
+      return isAssetPending(asset)
     }
     return getAssetStatus(asset) === filter
   })
@@ -129,10 +144,7 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
   // Count assets by status
   const statusCounts = {
     all: assets.length,
-    pending: assets.filter(a => {
-      const s = getAssetStatus(a)
-      return s === 'original' || s === 'generating'
-    }).length,
+    pending: assets.filter((a) => isAssetPending(a)).length,
     preview_ready: assets.filter(a => getAssetStatus(a) === 'preview_ready').length,
     approved: assets.filter(a => getAssetStatus(a) === 'approved').length,
     final_ready: assets.filter(a => getAssetStatus(a) === 'final_ready').length,
@@ -223,9 +235,9 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
       onDrop={handleDrop}
     >
       {/* Filter Bar */}
-      <div className="flex-shrink-0 h-12 border-b border-slate-700 flex items-center px-4 gap-4 bg-slate-800/50">
+      <div className="flex-shrink-0 min-h-12 border-b border-slate-700 flex items-center px-4 gap-4 bg-slate-800/50">
         {/* Filter Tabs */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-thin min-w-0">
           {([
             { id: 'all', label: 'All' },
             { id: 'pending', label: 'Pending' },
@@ -237,7 +249,7 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
             <button
               key={tab.id}
               onClick={() => setFilter(tab.id)}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
+              className={`px-2.5 py-1 text-xs rounded transition-colors flex-shrink-0 ${
                 filter === tab.id
                   ? 'bg-blue-600 text-white'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700'
@@ -279,20 +291,22 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
         </button>
 
         {/* View Toggle */}
-        <div className="flex items-center border border-slate-600 rounded-lg overflow-hidden">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-          >
-            <Grid className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-          >
-            <List className="w-4 h-4" />
-          </button>
-        </div>
+        {!libraryMode && (
+          <div className="flex items-center border border-slate-600 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Grid Content */}
@@ -335,9 +349,11 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
           </div>
         ) : (
           <div className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4'
-              : 'space-y-2'
+            libraryMode
+              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3'
+              : viewMode === 'grid'
+                ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4'
+                : 'space-y-2'
           }>
             {filteredAssets.map(asset => (
               <ModuleGridTile
@@ -347,11 +363,12 @@ export function ModuleGrid({ activeModule }: ModuleGridProps) {
                 activeModule={activeModule}
                 isSelected={selectedAssetIds.has(asset.id)}
                 isExpanded={expandedAssetId === asset.id}
-                viewMode={viewMode}
+                viewMode={libraryMode ? 'grid' : viewMode}
                 versionProgress={versionProgress}
                 onToggleSelect={() => toggleAssetSelection(asset.id)}
                 onToggleExpand={() => handleToggleExpand(asset.id)}
                 onCompare={handleCompare}
+                libraryThumbOnly={libraryMode}
               />
             ))}
           </div>

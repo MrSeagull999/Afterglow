@@ -1,5 +1,5 @@
 import type { Version, ModuleType, QualityTier, VersionRecipe } from '../../../../shared/types'
-import { createVersion, setVersionStatus, setVersionOutput } from '../../store/versionStore'
+import { createVersion, setVersionGenerationStatus, setVersionStatus, setVersionOutput } from '../../store/versionStore'
 import { getJobDirectory } from '../../store/jobStore'
 import { join } from 'path'
 
@@ -36,6 +36,7 @@ export async function completePreviewGeneration(
   thumbnailPath?: string
 ): Promise<Version | null> {
   await setVersionOutput(jobId, versionId, outputPath, thumbnailPath)
+  await setVersionGenerationStatus(jobId, versionId, 'completed')
   return setVersionStatus(jobId, versionId, 'preview_ready')
 }
 
@@ -44,6 +45,7 @@ export async function failGeneration(
   versionId: string,
   error: string
 ): Promise<Version | null> {
+  await setVersionGenerationStatus(jobId, versionId, 'failed', error)
   return setVersionStatus(jobId, versionId, 'error', error)
 }
 
@@ -51,6 +53,7 @@ export async function startFinalGeneration(
   jobId: string,
   versionId: string
 ): Promise<Version | null> {
+  await setVersionGenerationStatus(jobId, versionId, 'pending')
   return setVersionStatus(jobId, versionId, 'final_generating')
 }
 
@@ -60,6 +63,7 @@ export async function completeFinalGeneration(
   outputPath: string
 ): Promise<Version | null> {
   await setVersionOutput(jobId, versionId, outputPath)
+  await setVersionGenerationStatus(jobId, versionId, 'completed')
   return setVersionStatus(jobId, versionId, 'final_ready')
 }
 

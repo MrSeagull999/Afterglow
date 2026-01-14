@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useJobStore } from '../../store/useJobStore'
 import { useAppStore } from '../../store/useAppStore'
 import type { Asset, Version, VersionStatus, ModuleType } from '../../../shared/types'
+import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus'
 import {
   Check,
   X,
@@ -28,6 +29,7 @@ interface ModuleGridTileProps {
   onToggleSelect: () => void
   onToggleExpand: () => void
   onCompare?: (originalPath: string, outputPath: string) => void
+  libraryThumbOnly?: boolean
 }
 
 const STATUS_CONFIG: Record<VersionStatus | 'original', { color: string; label: string }> = {
@@ -59,7 +61,8 @@ export function ModuleGridTile({
   versionProgress,
   onToggleSelect,
   onToggleExpand,
-  onCompare
+  onCompare,
+  libraryThumbOnly = false
 }: ModuleGridTileProps) {
   const { currentJob, approveVersion, unapproveVersion } = useJobStore()
   const { addToast } = useAppStore()
@@ -120,7 +123,10 @@ export function ModuleGridTile({
   const displayedVersion = getDisplayedVersion()
   const currentStatus = getCurrentStatus()
   const statusConfig = STATUS_CONFIG[currentStatus]
-  const isGenerating = currentStatus === 'generating' || currentStatus === 'hq_generating' || currentStatus === 'final_generating'
+
+  const resolvedLatestGenerationStatus = resolveGenerationStatus(latestVersion)
+  const isGenerating = resolvedLatestGenerationStatus === 'pending'
+  const isFailed = resolvedLatestGenerationStatus === 'failed'
 
   const handleApprove = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -202,6 +208,54 @@ export function ModuleGridTile({
 
   // Grid view
   if (viewMode === 'grid') {
+    if (libraryThumbOnly) {
+      return (
+        <button
+          type="button"
+          data-testid="library-thumb"
+          onClick={onToggleSelect}
+          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all bg-slate-900 ${
+            isSelected
+              ? 'border-blue-500 ring-2 ring-blue-500/30'
+              : 'border-slate-800 hover:border-slate-600'
+          }`}
+        >
+          {thumbnail ? (
+            <img src={thumbnail} alt={asset.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-slate-500 animate-spin" />
+            </div>
+          )}
+
+          {isGenerating && (
+            <div
+              className="absolute inset-0 flex items-center justify-center bg-black/40"
+              data-testid="library-thumb-pending"
+            >
+              <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+            </div>
+          )}
+
+          {isFailed && !isGenerating && (
+            <div className="absolute top-2 right-2" data-testid="library-thumb-failed">
+              <AlertCircle className="w-4 h-4 text-amber-400 drop-shadow" />
+            </div>
+          )}
+
+          <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+            isSelected ? 'bg-blue-500 border-blue-500' : 'border-white/60 bg-black/30'
+          }`}>
+            {isSelected && <Check className="w-3 h-3 text-white" />}
+          </div>
+
+          <div className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1">
+            <div className="text-[11px] text-slate-200 truncate" title={asset.name}>{asset.name}</div>
+          </div>
+        </button>
+      )
+    }
+
     return (
       <div className="flex flex-col">
         <div
@@ -227,26 +281,16 @@ export function ModuleGridTile({
             )}
 
             {/* Generating overlay */}
-            {isGenerating && latestVersion && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <div className="text-center px-4 w-full">
-                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin mx-auto" />
-                  <span className="text-xs text-white mt-2 block font-medium">
-                    {currentStatus === 'final_generating' ? 'Generating Final...' : 
-                     currentStatus === 'hq_generating' ? 'Generating HQ...' : 'Processing...'}
-                  </span>
-                  {versionProgress[latestVersion.id] !== undefined && (
-                    <div className="mt-2 px-2">
-                      <div className="text-xs text-white mb-1 font-medium">{Math.round(versionProgress[latestVersion.id])}%</div>
-                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 transition-all duration-300"
-                          style={{ width: `${versionProgress[latestVersion.id]}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
+            {isGenerating && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center" data-testid="library-tile-pending">
+                <Loader2 className="w-7 h-7 text-blue-400 animate-spin" />
+              </div>
+            )}
+
+            {/* Failed indicator */}
+            {isFailed && !isGenerating && (
+              <div className="absolute top-2 right-2" data-testid="library-tile-failed">
+                <AlertCircle className="w-4 h-4 text-amber-400 drop-shadow" />
               </div>
             )}
 
@@ -289,13 +333,7 @@ export function ModuleGridTile({
               {asset.name}
             </div>
 
-            {/* Error message */}
-            {currentStatus === 'error' && latestVersion?.error && (
-              <div className="flex items-start gap-1 text-xs text-red-400 mt-1">
-                <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                <span className="truncate" title={latestVersion.error}>{latestVersion.error}</span>
-              </div>
-            )}
+            
 
             {/* Action buttons */}
             {latestVersion && !isGenerating && (
@@ -371,7 +409,8 @@ export function ModuleGridTile({
   return (
     <div
       onClick={onToggleSelect}
-      className={`flex items-center gap-4 p-3 bg-slate-800 rounded-lg border-2 transition-all cursor-pointer ${
+      data-testid="library-row"
+      className={`flex items-center gap-4 px-3 py-3 min-h-[88px] bg-slate-800 rounded-lg border-2 transition-all cursor-pointer ${
         isSelected 
           ? 'border-blue-500 ring-2 ring-blue-500/30' 
           : 'border-transparent hover:border-slate-600'
@@ -385,7 +424,7 @@ export function ModuleGridTile({
       </div>
 
       {/* Thumbnail */}
-      <div className="w-16 h-16 rounded overflow-hidden bg-slate-900 flex-shrink-0">
+      <div data-testid="library-row-thumb" className="w-20 h-20 rounded overflow-hidden bg-slate-900 flex-shrink-0">
         {thumbnail ? (
           <img src={thumbnail} alt={asset.name} className="w-full h-full object-cover" />
         ) : (

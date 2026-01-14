@@ -12,7 +12,8 @@ import {
 } from '../../shared/moduleRunner'
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
-import { buildRenovatePrompt, RenovateChanges } from './renovatePrompts'
+import type { RenovateChanges } from './renovatePrompts'
+import { buildRenovateBasePrompt } from '../../../../../shared/services/prompt/prompts'
 import { PromptAssembler } from '../../../services/prompt/promptAssembler'
 
 export interface RenovateParams {
@@ -43,13 +44,13 @@ export async function generateRenovatePreview(params: RenovateParams): Promise<V
   const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
   const injectorPrompt = await buildInjectorPromptFromIds('renovate', injectorIds)
 
-  const basePrompt = buildRenovatePrompt(params.changes)
+  const basePrompt = buildRenovateBasePrompt(params.changes as any)
   
   // Use PromptAssembler for consistent prompt building and hash generation
   const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
   const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
   
-  const assembled = PromptAssembler.assemble({
+  const assembled = await PromptAssembler.assemble({
     module: 'renovate',
     basePrompt,
     injectorPrompts,
@@ -65,6 +66,8 @@ export async function generateRenovatePreview(params: RenovateParams): Promise<V
     settings: {
       inputPath: sourceVersion.outputPath,
       changes: params.changes,
+      injectorPrompts,
+      guardrailPrompts,
       fullPrompt,
       promptHash: assembled.hash
     }

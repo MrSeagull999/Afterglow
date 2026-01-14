@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useJobStore } from '../../store/useJobStore'
 import { useAppStore } from '../../store/useAppStore'
 import type { Version } from '../../../shared/types'
+import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus'
 import {
   ChevronLeft,
   ChevronRight,
@@ -83,6 +84,8 @@ export function VersionCarousel() {
   }, [versions.length])
 
   const currentVersion = versions[currentIndex]
+  const resolvedCurrentGenerationStatus = resolveGenerationStatus(currentVersion)
+  const isPending = resolvedCurrentGenerationStatus === 'pending'
 
   const handlePrev = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
@@ -240,10 +243,10 @@ export function VersionCarousel() {
                 </div>
 
                 {/* Progress bar for generating versions */}
-                {(currentVersion.status === 'generating' || currentVersion.status === 'final_generating') && (
+                {isPending && (
                   <div className="mb-2">
                     <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                      <span>{currentVersion.status === 'final_generating' ? 'Generating 4K...' : 'Generating...'}</span>
+                      <span>Generating...</span>
                       <span>{versionProgress[currentVersion.id] || 0}%</span>
                     </div>
                     <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
@@ -260,8 +263,7 @@ export function VersionCarousel() {
                   <button
                     onClick={handleApprove}
                     disabled={
-                      currentVersion.status === 'generating' ||
-                      currentVersion.status === 'final_generating'
+                      isPending
                     }
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       currentVersion.status === 'approved'
@@ -385,18 +387,19 @@ function VersionImage({ version }: { version: Version }) {
   }
 
   if (!imageUrl) {
+    const resolved = resolveGenerationStatus(version)
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="text-center text-slate-500">
-          {version.status === 'generating' || version.status === 'final_generating' ? (
+          {resolved === 'pending' ? (
             <>
               <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin" />
               <p className="text-sm">Generating...</p>
             </>
-          ) : version.status === 'error' ? (
+          ) : resolved === 'failed' ? (
             <>
               <X className="w-8 h-8 mx-auto mb-2 text-red-400" />
-              <p className="text-sm text-red-400">{version.error || 'Generation failed'}</p>
+              <p className="text-sm text-red-400">{version.generationError || version.error || 'Generation failed'}</p>
             </>
           ) : (
             <>

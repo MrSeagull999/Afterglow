@@ -6,12 +6,21 @@ import { generateSeed } from '../../gemini/geminiClient'
 import { getSettings } from '../../settings'
 import { saveImageWithExifHandling } from '../../exif'
 import type { Version, ModuleType } from '../../../../shared/types'
-import { getVersion, setVersionStatus, setVersionOutput } from '../../store/versionStore'
+import {
+  getVersion,
+  setVersionStatus,
+  setVersionOutput,
+  setVersionGenerationStatus
+} from '../../store/versionStore'
 import { getAsset } from '../../store/assetStore'
 import { getJobDirectory } from '../../store/jobStore'
-import { getImageProvider } from '../../providers/providerRouter'
+import { getResolvedImageProvider } from '../../providers/providerRouter'
 import { generationLogger } from '../../services/generation/generationLogger'
-import { PromptAssembler } from '../../services/prompt/promptAssembler'
+import { assemblePrompt } from '../../../../shared/services/prompt/promptAssembler'
+import { v4 as uuidv4 } from 'uuid'
+
+export const HQ_PREVIEW_REQUIRES_APPROVAL = false
+export const HQ_PREVIEW_AUTO_APPROVES = false
 
 export interface GenerateResult {
   success: boolean
@@ -71,8 +80,20 @@ export async function generateVersionPreview(
     const base64Image = resizedBuffer.toString('base64')
     const mimeType = getMimeType(inputPath)
 
-    // Build full prompt from recipe
-    const fullPrompt = version.recipe.settings.fullPrompt as string || version.recipe.basePrompt
+    const injectorPrompts = (version.recipe.settings.injectorPrompts as string[] | undefined) || []
+    const guardrailPrompts = (version.recipe.settings.guardrailPrompts as string[] | undefined) || []
+    const customInstructions = (version.recipe.settings.customInstructions as string | undefined) || ''
+
+    const assembled = await assemblePrompt({
+      moduleType: version.module,
+      basePrompt: version.recipe.basePrompt,
+      options: injectorPrompts,
+      guardrails: guardrailPrompts,
+      extraInstructions: customInstructions
+    })
+
+    const fullPrompt = assembled.fullPrompt
+    const promptHash = assembled.promptHash
 
     // Determine seed
     let seed: number | null = version.seed ?? null
@@ -83,22 +104,30 @@ export async function generateVersionPreview(
     // Use configured model or fall back to settings
     const model = version.model || settings.previewImageModel || settings.previewModel
 
+    const requestId = uuidv4()
+
     onProgress?.(40)
 
     // PRIVACY GUARANTEE: Log only jobId and assetId, never filenames
     console.log(`[GenerateService] Generating ${version.module} preview for job:${jobId} asset:${asset.id} version:${versionId}`)
     console.log(`[GenerateService] Using model: ${model}`)
-    console.log(`[GenerateService] Provider: ${settings.imageProvider || 'google'}`)
 
-    // Get provider and generate image
-    const provider = await getImageProvider()
-    const promptHash = PromptAssembler.generateHash(fullPrompt)
+    const selectionCount = 1
+    const { provider, resolved } = await getResolvedImageProvider(model)
+
+    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
+    const endpoint = resolved.provider === 'openrouter'
+      ? `${resolved.endpointBaseUrl}/chat/completions`
+      : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
+
+    console.log(`[GenerateService] Effective provider: ${providerName}`)
+    console.log(`[GenerateService] Endpoint base: ${resolved.endpointBaseUrl}`)
     console.log(`[GenerateService] Prompt hash: ${promptHash}`)
     
     // RUNTIME ASSERTION: Verify prompt hash matches what was stored in recipe
     // This ensures preview == payload (what user sees is what gets sent)
     const storedHash = version.recipe.settings.promptHash as string | undefined
-    if (storedHash && storedHash !== promptHash) {
+    if (process.env.NODE_ENV !== 'production' && storedHash && storedHash !== promptHash) {
       console.error(`[GenerateService] HASH MISMATCH DETECTED!`)
       console.error(`[GenerateService] Stored hash: ${storedHash}`)
       console.error(`[GenerateService] Computed hash: ${promptHash}`)
@@ -108,11 +137,16 @@ export async function generateVersionPreview(
         timestamp: new Date().toISOString(),
         jobId,
         versionId,
-        provider: settings.imageProvider || 'google',
+        requestId,
+        provider: providerName,
         model,
-        endpoint: 'HASH_MISMATCH_ERROR',
+        endpoint,
+        endpointBaseUrl: resolved.endpointBaseUrl,
+        resolvedBy: resolved.resolvedBy,
+        envOverride: resolved.envOverride,
         promptHash: `MISMATCH: stored=${storedHash} computed=${promptHash}`,
         module: version.module,
+        selectionCount,
         success: false,
         error: 'Preview hash does not match payload hash - prompt integrity violation'
       })
@@ -125,31 +159,32 @@ export async function generateVersionPreview(
       model,
       imageSize: '1024x1024',
       seed,
-      priorityMode: settings.previewPriorityMode && settings.imageProvider === 'openrouter'
+      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter'
     })
 
     onProgress?.(80)
 
     // Log generation attempt
-    const providerName = settings.imageProvider || 'google'
-    const endpoint = providerName === 'openrouter' 
-      ? `${process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'}/chat/completions`
-      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
-    
     generationLogger.log({
       timestamp: new Date().toISOString(),
       jobId,
       versionId,
       provider: providerName,
+      requestId,
       model,
       endpoint,
+      endpointBaseUrl: resolved.endpointBaseUrl,
+      resolvedBy: resolved.resolvedBy,
+      envOverride: resolved.envOverride,
       promptHash,
       module: version.module,
+      selectionCount,
       success: response.success,
       error: response.error
     })
 
     if (!response.success || !response.imageData) {
+      await setVersionGenerationStatus(jobId, versionId, 'failed', response.error || 'Generation failed')
       await setVersionStatus(jobId, versionId, 'error', response.error || 'Generation failed')
       return {
         success: false,
@@ -188,6 +223,7 @@ export async function generateVersionPreview(
 
     // Update version
     await setVersionOutput(jobId, versionId, outputPath, thumbnailPath)
+    await setVersionGenerationStatus(jobId, versionId, 'completed')
     await setVersionStatus(jobId, versionId, 'preview_ready')
 
     onProgress?.(100)
@@ -201,6 +237,7 @@ export async function generateVersionPreview(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('[GenerateService] Error:', errorMessage)
+    await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
     return {
       success: false,
@@ -222,10 +259,7 @@ export async function generateVersionHQPreview(
       throw new Error(`Version not found: ${versionId}`)
     }
 
-    if (version.status !== 'approved') {
-      throw new Error('Version must be approved before generating HQ preview')
-    }
-
+    await setVersionGenerationStatus(jobId, versionId, 'pending')
     await setVersionStatus(jobId, versionId, 'hq_generating')
 
     const asset = await getAsset(jobId, version.assetId)
@@ -262,17 +296,37 @@ export async function generateVersionHQPreview(
     const base64Image = resizedBuffer.toString('base64')
     const mimeType = getMimeType(inputPath)
 
-    const fullPrompt = version.recipe.settings.fullPrompt as string || version.recipe.basePrompt
+    const injectorPrompts = (version.recipe.settings.injectorPrompts as string[] | undefined) || []
+    const guardrailPrompts = (version.recipe.settings.guardrailPrompts as string[] | undefined) || []
+    const customInstructions = (version.recipe.settings.customInstructions as string | undefined) || ''
+
+    const assembled = await assemblePrompt({
+      moduleType: version.module,
+      basePrompt: version.recipe.basePrompt,
+      options: injectorPrompts,
+      guardrails: guardrailPrompts,
+      extraInstructions: customInstructions
+    })
+
+    const fullPrompt = assembled.fullPrompt
 
     const seed = version.seed ?? null
     const model = (settings as any).hqPreviewModel || settings.previewImageModel || settings.previewModel
+
+    const requestId = uuidv4()
 
     onProgress?.(40)
 
     // PRIVACY GUARANTEE: Log only jobId and assetId
     console.log(`[GenerateService] Generating ${version.module} HQ preview for job:${jobId} asset:${asset.id} version:${versionId}`)
 
-    const provider = await getImageProvider()
+    const selectionCount = 1
+    const { provider, resolved } = await getResolvedImageProvider(model)
+    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
+    const endpoint = resolved.provider === 'openrouter'
+      ? `${resolved.endpointBaseUrl}/chat/completions`
+      : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
+
     const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
@@ -280,12 +334,31 @@ export async function generateVersionHQPreview(
       model,
       imageSize: '1536x1536',
       seed,
-      priorityMode: settings.previewPriorityMode && settings.imageProvider === 'openrouter'
+      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter'
+    })
+
+    generationLogger.log({
+      timestamp: new Date().toISOString(),
+      jobId,
+      versionId,
+      provider: providerName,
+      requestId,
+      model,
+      endpoint,
+      endpointBaseUrl: resolved.endpointBaseUrl,
+      resolvedBy: resolved.resolvedBy,
+      envOverride: resolved.envOverride,
+      promptHash: assembled.promptHash,
+      module: version.module,
+      selectionCount,
+      success: response.success,
+      error: response.error
     })
 
     onProgress?.(80)
 
     if (!response.success || !response.imageData) {
+      await setVersionGenerationStatus(jobId, versionId, 'failed', response.error || 'HQ generation failed')
       await setVersionStatus(jobId, versionId, 'error', response.error || 'HQ generation failed')
       return {
         success: false,
@@ -311,6 +384,7 @@ export async function generateVersionHQPreview(
     onProgress?.(95)
 
     await setVersionOutput(jobId, versionId, outputPath)
+    await setVersionGenerationStatus(jobId, versionId, 'completed')
     await setVersionStatus(jobId, versionId, 'hq_ready')
 
     // Update quality tier
@@ -327,6 +401,7 @@ export async function generateVersionHQPreview(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('[GenerateService] HQ error:', errorMessage)
+    await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
     return {
       success: false,
@@ -353,6 +428,7 @@ export async function generateVersionFinal(
       throw new Error('Version must be approved or HQ ready before generating final')
     }
 
+    await setVersionGenerationStatus(jobId, versionId, 'pending')
     await setVersionStatus(jobId, versionId, 'final_generating')
 
     const asset = await getAsset(jobId, version.assetId)
@@ -391,18 +467,47 @@ export async function generateVersionFinal(
     const base64Image = resizedBuffer.toString('base64')
     const mimeType = getMimeType(inputPath)
 
-    const fullPrompt = version.recipe.settings.fullPrompt as string || version.recipe.basePrompt
+    const injectorPrompts = (version.recipe.settings.injectorPrompts as string[] | undefined) || []
+    const guardrailPrompts = (version.recipe.settings.guardrailPrompts as string[] | undefined) || []
+    const customInstructions = (version.recipe.settings.customInstructions as string | undefined) || ''
+
+    const assembled = await assemblePrompt({
+      moduleType: version.module,
+      basePrompt: version.recipe.basePrompt,
+      options: injectorPrompts,
+      guardrails: guardrailPrompts,
+      extraInstructions: customInstructions
+    })
+
+    const fullPrompt = assembled.fullPrompt
+    const promptHash = assembled.promptHash
 
     // Use same seed as preview if available
     const seed = version.seed ?? null
     const model = settings.advancedCustomModel || settings.finalModel || 'gemini-3-pro-image-preview'
+
+    const requestId = uuidv4()
 
     onProgress?.(40)
 
     // PRIVACY GUARANTEE: Log only jobId and assetId
     console.log(`[GenerateService] Generating ${version.module} final for job:${jobId} asset:${asset.id} version:${versionId}`)
 
-    const provider = await getImageProvider()
+    const storedHash = version.recipe.settings.promptHash as string | undefined
+    if (process.env.NODE_ENV !== 'production' && storedHash && storedHash !== promptHash) {
+      console.error(`[GenerateService] HASH MISMATCH DETECTED!`)
+      console.error(`[GenerateService] Stored hash: ${storedHash}`)
+      console.error(`[GenerateService] Computed hash: ${promptHash}`)
+      console.error(`[GenerateService] Call site: generateVersionFinal`)
+    }
+
+    const selectionCount = 1
+    const { provider, resolved } = await getResolvedImageProvider(model)
+    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
+    const endpoint = resolved.provider === 'openrouter'
+      ? `${resolved.endpointBaseUrl}/chat/completions`
+      : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
+
     const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
@@ -413,9 +518,28 @@ export async function generateVersionFinal(
       priorityMode: false // Finals don't use priority mode
     })
 
+    generationLogger.log({
+      timestamp: new Date().toISOString(),
+      jobId,
+      versionId,
+      provider: providerName,
+      requestId,
+      model,
+      endpoint,
+      endpointBaseUrl: resolved.endpointBaseUrl,
+      resolvedBy: resolved.resolvedBy,
+      envOverride: resolved.envOverride,
+      promptHash,
+      module: version.module,
+      selectionCount,
+      success: response.success,
+      error: response.error
+    })
+
     onProgress?.(80)
 
     if (!response.success || !response.imageData) {
+      await setVersionGenerationStatus(jobId, versionId, 'failed', response.error || 'Final generation failed')
       await setVersionStatus(jobId, versionId, 'error', response.error || 'Final generation failed')
       return {
         success: false,
@@ -442,6 +566,7 @@ export async function generateVersionFinal(
     onProgress?.(95)
 
     await setVersionOutput(jobId, versionId, outputPath)
+    await setVersionGenerationStatus(jobId, versionId, 'completed')
     await setVersionStatus(jobId, versionId, 'final_ready')
 
     onProgress?.(100)
@@ -454,6 +579,7 @@ export async function generateVersionFinal(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('[GenerateService] Final error:', errorMessage)
+    await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
     return {
       success: false,

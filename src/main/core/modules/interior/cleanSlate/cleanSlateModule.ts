@@ -12,7 +12,7 @@ import {
 } from '../../shared/moduleRunner'
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
-import { buildCleanSlatePrompt } from './cleanSlatePrompts'
+import { buildCleanSlateBasePrompt } from '../../../../../shared/services/prompt/prompts'
 import { PromptAssembler } from '../../../services/prompt/promptAssembler'
 
 export interface CleanSlateParams {
@@ -46,14 +46,14 @@ export async function generateCleanSlatePreview(params: CleanSlateParams): Promi
   const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
   const injectorPrompt = await buildInjectorPromptFromIds('clean', injectorIds)
 
-  const basePrompt = buildCleanSlatePrompt()
+  const basePrompt = buildCleanSlateBasePrompt()
   const customInstructions = params.customInstructions?.trim() || ''
   
   // Use PromptAssembler for consistent prompt building and hash generation
   const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
   const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
   
-  const assembled = PromptAssembler.assemble({
+  const assembled = await PromptAssembler.assemble({
     module: 'clean',
     basePrompt,
     injectorPrompts,
@@ -70,6 +70,8 @@ export async function generateCleanSlatePreview(params: CleanSlateParams): Promi
     settings: {
       inputPath,
       customInstructions,
+      injectorPrompts,
+      guardrailPrompts,
       fullPrompt,
       promptHash: assembled.hash
     }

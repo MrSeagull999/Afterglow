@@ -40,12 +40,13 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
 
   const guardrailIds = getDefaultGuardrailIds('twilight')
   const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
+  const injectorPrompts: string[] = []
 
   // Use PromptAssembler for consistent prompt building and hash generation
-  const assembled = PromptAssembler.assemble({
+  const assembled = await PromptAssembler.assemble({
     module: 'twilight',
     basePrompt: params.promptTemplate,
-    injectorPrompts: [],
+    injectorPrompts,
     guardrailPrompts
   })
   
@@ -59,6 +60,8 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
       inputPath,
       presetId: params.presetId,
       lightingCondition: params.lightingCondition,
+      injectorPrompts,
+      guardrailPrompts,
       fullPrompt,
       promptHash: assembled.hash
     }

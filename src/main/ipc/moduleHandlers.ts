@@ -3,12 +3,9 @@ import { loadInjectorsForModule, reloadInjectors } from '../core/modules/shared/
 import { getGuardrailsForModule, ARCHITECTURAL_GUARDRAILS, buildGuardrailPrompt } from '../core/modules/shared/guardrails'
 import { generateVersionPreview, generateVersionHQPreview, generateVersionFinal } from '../core/modules/shared/generateService'
 import type { ModuleType } from '../../shared/types'
-import { PromptAssembler } from '../core/services/prompt/promptAssembler'
-import { buildInjectorPromptFromIds } from '../core/modules/shared/injectorRegistry'
-import { buildStagingPrompt } from '../core/modules/interior/staging/stagingPrompts'
-import { buildCleanSlatePrompt } from '../core/modules/interior/cleanSlate/cleanSlatePrompts'
-import { buildRenovatePrompt, RenovateChanges } from '../core/modules/interior/renovate/renovatePrompts'
 import { generationLogger } from '../core/services/generation/generationLogger'
+import { getSettings } from '../core/settings'
+import { getResolvedProviderConfig } from '../../shared/services/provider/resolvedProviderConfig'
 
 import {
   generateCleanSlatePreview,
@@ -164,10 +161,11 @@ export function registerModuleHandlers(): void {
   ipcMain.handle('module:clean:batchGenerate', async (_event, params: {
     jobId: string
     assetIds: string[]
+    sourceVersionIdByAssetId?: Record<string, string>
     injectorIds?: string[]
     guardrailIds?: string[]
   }) => {
-    const { jobId, assetIds, injectorIds, guardrailIds } = params
+    const { jobId, assetIds, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
     for (const assetId of assetIds) {
@@ -175,6 +173,7 @@ export function registerModuleHandlers(): void {
         const version = await generateCleanSlatePreview({
           jobId,
           assetId,
+          sourceVersionId: sourceVersionIdByAssetId?.[assetId],
           injectorIds: injectorIds || [],
           customGuardrails: guardrailIds || []
         })
@@ -200,16 +199,17 @@ export function registerModuleHandlers(): void {
     roomType?: string
     style?: string
     sourceVersionId?: string
+    sourceVersionIdByAssetId?: Record<string, string>
     injectorIds?: string[]
     guardrailIds?: string[]
   }) => {
-    const { jobId, assetIds, roomType, style, sourceVersionId, injectorIds, guardrailIds } = params
+    const { jobId, assetIds, roomType, style, sourceVersionId, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
     for (const assetId of assetIds) {
       try {
         // Use provided sourceVersionId or default to original image
-        const source = sourceVersionId || `original:${assetId}`
+        const source = sourceVersionIdByAssetId?.[assetId] || sourceVersionId || `original:${assetId}`
         
         const version = await generateStagingPreview({
           jobId,
@@ -240,16 +240,17 @@ export function registerModuleHandlers(): void {
     assetIds: string[]
     changes?: any
     sourceVersionId?: string
+    sourceVersionIdByAssetId?: Record<string, string>
     injectorIds?: string[]
     guardrailIds?: string[]
   }) => {
-    const { jobId, assetIds, changes, sourceVersionId, injectorIds, guardrailIds } = params
+    const { jobId, assetIds, changes, sourceVersionId, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
     for (const assetId of assetIds) {
       try {
         // Use provided sourceVersionId or default to original image
-        const source = sourceVersionId || `original:${assetId}`
+        const source = sourceVersionIdByAssetId?.[assetId] || sourceVersionId || `original:${assetId}`
         
         const version = await generateRenovatePreview({
           jobId,
@@ -280,8 +281,9 @@ export function registerModuleHandlers(): void {
     presetId?: string
     promptTemplate?: string
     lightingCondition?: 'overcast' | 'sunny'
+    sourceVersionIdByAssetId?: Record<string, string>
   }) => {
-    const { jobId, assetIds, presetId, promptTemplate, lightingCondition } = params
+    const { jobId, assetIds, presetId, promptTemplate, lightingCondition, sourceVersionIdByAssetId } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
     // Default prompt template if not provided
@@ -292,6 +294,7 @@ export function registerModuleHandlers(): void {
         const version = await generateTwilightPreview({
           jobId,
           assetId,
+          sourceVersionId: sourceVersionIdByAssetId?.[assetId],
           presetId: presetId || 'twilight_exterior_classic',
           promptTemplate: template,
           lightingCondition: lightingCondition || 'overcast'
@@ -335,67 +338,6 @@ export function registerModuleHandlers(): void {
     return CURTAIN_STYLES
   })
 
-  // Prompt assembly handler - supports ALL modules
-  ipcMain.handle('prompt:assemblePhase2', async (_event, params: {
-    module: string
-    roomType?: string
-    style?: string
-    changes?: RenovateChanges
-    presetId?: string
-    lightingCondition?: 'overcast' | 'sunny'
-    injectorIds: string[]
-    guardrailIds: string[]
-    customInstructions?: string
-  }) => {
-    // Build base prompt based on module type
-    let basePrompt: string
-    const moduleType = params.module as ModuleType
-
-    switch (moduleType) {
-      case 'clean':
-        basePrompt = buildCleanSlatePrompt()
-        break
-      case 'stage':
-        basePrompt = buildStagingPrompt({
-          roomType: params.roomType,
-          style: params.style
-        })
-        break
-      case 'renovate':
-        basePrompt = params.changes 
-          ? buildRenovatePrompt(params.changes)
-          : 'Select renovation changes to see prompt preview.'
-        break
-      case 'twilight':
-        // Twilight uses preset templates - show a representative prompt
-        basePrompt = `Transform this daytime exterior photo into a stunning twilight/dusk scene. The sky should show deep blue hour colors with warm orange and pink tones near the horizon. All interior lights should be warmly lit, glowing invitingly through windows. Exterior landscape lighting should be on. Maintain all architectural details exactly as shown.${params.lightingCondition === 'sunny' ? ' Account for strong shadows from direct sunlight in the original.' : ''}`
-        break
-      default:
-        basePrompt = 'Unknown module type'
-    }
-
-    const injectorPrompt = await buildInjectorPromptFromIds(moduleType, params.injectorIds)
-    const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
-    
-    const guardrailPrompts = params.guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
-
-    const assembled = PromptAssembler.assemble({
-      module: params.module,
-      basePrompt,
-      injectorPrompts,
-      guardrailPrompts,
-      customInstructions: params.customInstructions,
-      roomType: params.roomType,
-      style: params.style
-    })
-
-    return {
-      finalPrompt: assembled.finalPrompt,
-      hash: assembled.hash,
-      metadata: assembled.metadata
-    }
-  })
-
   // Debug handlers
   ipcMain.handle('debug:getLastLog', async () => {
     return generationLogger.getLastLog()
@@ -403,5 +345,17 @@ export function registerModuleHandlers(): void {
 
   ipcMain.handle('debug:getRecentLogs', async (_event, count: number = 10) => {
     return generationLogger.getRecentLogs(count)
+  })
+
+  ipcMain.handle('provider:getResolvedProviderConfig', async (_event, params: {
+    uiProvider?: 'google' | 'openrouter'
+    intendedModel: string
+  }) => {
+    const settings = await getSettings()
+    return getResolvedProviderConfig({
+      uiProvider: params.uiProvider || settings.imageProvider,
+      intendedModel: params.intendedModel,
+      env: process.env
+    })
   })
 }

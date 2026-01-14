@@ -19,6 +19,8 @@ export type VersionStatus =
 
 export type QualityTier = 'preview' | 'hq_preview' | 'final'
 
+export type GenerationStatus = 'idle' | 'pending' | 'completed' | 'failed'
+
 // ─────────────────────────────────────────────────────────────
 // JOB
 // ─────────────────────────────────────────────────────────────
@@ -98,6 +100,11 @@ export interface Version {
   thumbnailPath?: string
   error?: string
 
+  generationStatus?: GenerationStatus
+  generationError?: string
+  startedAt?: number
+  completedAt?: number
+
   recipe: VersionRecipe
   sourceVersionIds: string[]
   parentVersionId?: string
@@ -106,7 +113,9 @@ export interface Version {
   model?: string
 
   createdAt: string
-  approvedAt?: string
+  lifecycleStatus?: 'draft' | 'approved'
+  approvedAt?: number
+  approvedBy?: string
   finalGeneratedAt?: string
 }
 

@@ -1,9 +1,9 @@
-import crypto from 'crypto'
+import { assemblePrompt } from '../../../../shared/services/prompt/promptAssembler'
+import type { PromptModuleType } from '../../../../shared/services/prompt/promptAssembler'
 
 export interface PromptSection {
   name: string
   content: string
-  priority: number
 }
 
 export interface AssembledPrompt {
@@ -30,48 +30,28 @@ export interface PromptAssemblerParams {
   style?: string
 }
 
+/**
+ * Phase 2: Single prompt truth surface.
+ * This wrapper exists for backwards compatibility with older call sites.
+ * Authoritative assembly + SHA-256 hashing is performed by the shared assembler.
+ */
 export class PromptAssembler {
-  static assemble(params: PromptAssemblerParams): AssembledPrompt {
-    const sections: PromptSection[] = []
-
-    sections.push({
-      name: 'Base Prompt',
-      content: params.basePrompt,
-      priority: 1
+  static async assemble(params: PromptAssemblerParams): Promise<AssembledPrompt> {
+    const assembled = await assemblePrompt({
+      moduleType: params.module as PromptModuleType,
+      basePrompt: params.basePrompt,
+      options: params.injectorPrompts,
+      guardrails: params.guardrailPrompts,
+      extraInstructions: params.customInstructions
     })
 
-    if (params.injectorPrompts && params.injectorPrompts.length > 0) {
-      sections.push({
-        name: 'Options & Modifiers',
-        content: params.injectorPrompts.join(' '),
-        priority: 2
-      })
-    }
-
-    if (params.customInstructions && params.customInstructions.trim()) {
-      sections.push({
-        name: 'Custom Instructions',
-        content: params.customInstructions.trim(),
-        priority: 3
-      })
-    }
-
-    if (params.guardrailPrompts && params.guardrailPrompts.length > 0) {
-      sections.push({
-        name: 'Guardrails',
-        content: params.guardrailPrompts.join(' '),
-        priority: 4
-      })
-    }
-
-    const sortedSections = sections.sort((a, b) => a.priority - b.priority)
-    const finalPrompt = sortedSections.map(s => s.content).filter(Boolean).join('\n\n')
-    const hash = this.generateHash(finalPrompt)
-
     return {
-      finalPrompt,
-      sections: sortedSections,
-      hash,
+      finalPrompt: assembled.fullPrompt,
+      sections: assembled.sections.map((s) => ({
+        name: s.id,
+        content: s.content
+      })),
+      hash: assembled.promptHash,
       metadata: {
         roomType: params.roomType,
         style: params.style,
@@ -83,13 +63,17 @@ export class PromptAssembler {
     }
   }
 
-  static generateHash(prompt: string): string {
-    return crypto.createHash('sha256').update(prompt).digest('hex').slice(0, 8)
+  static async generateHash(prompt: string): Promise<string> {
+    const assembled = await assemblePrompt({
+      moduleType: 'clean',
+      basePrompt: prompt
+    })
+    return assembled.promptHash
   }
 
   static formatForDisplay(assembled: AssembledPrompt): string {
     return assembled.sections
-      .map(section => `[${section.name}]\n${section.content}`)
+      .map((section) => `[${section.name}]\n${section.content}`)
       .join('\n\n---\n\n')
   }
 }

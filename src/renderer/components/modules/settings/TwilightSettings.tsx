@@ -17,7 +17,13 @@ export function TwilightSettings() {
   useEffect(() => {
     async function loadPresets() {
       try {
-        const allPresets = await window.electronAPI.getPresets()
+        const electronAPI = (globalThis as any)?.window?.electronAPI as { getPresets?: () => Promise<any[]> } | undefined
+        if (!electronAPI?.getPresets) {
+          setTwilightPresets([])
+          return
+        }
+
+        const allPresets = await electronAPI.getPresets()
         setTwilightPresets(allPresets)
       } catch (error) {
         console.error('Failed to load presets:', error)

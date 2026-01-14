@@ -1,12 +1,17 @@
 export interface GenerationLogEntry {
   timestamp: string
+  requestId?: string
   jobId: string
   versionId: string
   provider: 'google' | 'openrouter'
   model: string
   endpoint: string
+  endpointBaseUrl?: string
+  resolvedBy?: 'ui' | 'env_override'
+  envOverride?: { key: string; value: string }
   promptHash: string
   module: string
+  selectionCount?: number
   success: boolean
   error?: string
   tokenUsage?: {
@@ -28,6 +33,18 @@ class GenerationLogger {
 
     console.log(`[GenerationLogger] ${entry.provider}/${entry.model} - ${entry.module} - ${entry.success ? 'SUCCESS' : 'FAILED'}`)
     console.log(`[GenerationLogger] Endpoint: ${entry.endpoint}`)
+    if (entry.endpointBaseUrl) {
+      console.log(`[GenerationLogger] Endpoint base: ${entry.endpointBaseUrl}`)
+    }
+    if (entry.requestId) {
+      console.log(`[GenerationLogger] requestId: ${entry.requestId}`)
+    }
+    if (entry.resolvedBy) {
+      console.log(`[GenerationLogger] resolvedBy: ${entry.resolvedBy}`)
+    }
+    if (entry.envOverride) {
+      console.log(`[GenerationLogger] envOverride: ${entry.envOverride.key}=${entry.envOverride.value}`)
+    }
     console.log(`[GenerationLogger] Prompt Hash: ${entry.promptHash}`)
     if (entry.error) {
       console.log(`[GenerationLogger] Error: ${entry.error}`)

@@ -13,7 +13,8 @@ import {
 } from '../../shared/moduleRunner'
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
-import { buildStagingPrompt, buildSecondaryAnglePrompt } from './stagingPrompts'
+import { buildSecondaryAnglePrompt } from './stagingPrompts'
+import { buildStagingBasePrompt } from '../../../../../shared/services/prompt/prompts'
 import { PromptAssembler } from '../../../services/prompt/promptAssembler'
 
 export interface StagingParams {
@@ -60,12 +61,12 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
   const injectorPrompt = await buildInjectorPromptFromIds('stage', injectorIds)
   const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
 
-  const basePrompt = buildStagingPrompt({
-    roomType: params.roomType,
-    style: params.style
+  const basePrompt = buildStagingBasePrompt({
+    roomType: params.roomType || 'room',
+    style: params.style || 'modern contemporary'
   })
 
-  const assembled = PromptAssembler.assemble({
+  const assembled = await PromptAssembler.assemble({
     module: 'stage',
     basePrompt,
     injectorPrompts,
@@ -95,6 +96,8 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
       roomType: params.roomType,
       style: params.style,
       customInstructions: params.customInstructions,
+      injectorPrompts,
+      guardrailPrompts,
       fullPrompt,
       promptHash: assembled.hash
     }
@@ -132,15 +135,27 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
   const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
   const injectorIds = params.injectorIds || []
 
-  const guardrailPrompt = buildGuardrailPrompt(guardrailIds)
+  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
   const injectorPrompt = await buildInjectorPromptFromIds('stage', injectorIds)
+  const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
 
   const basePrompt = buildSecondaryAnglePrompt({
     furnitureSpec: params.furnitureSpec.description,
     roomType: params.roomType,
     style: params.style
   })
-  const fullPrompt = [basePrompt, injectorPrompt, guardrailPrompt].filter(Boolean).join(' ')
+
+  const assembled = await PromptAssembler.assemble({
+    module: 'stage',
+    basePrompt,
+    injectorPrompts,
+    guardrailPrompts,
+    customInstructions: params.customInstructions,
+    roomType: params.roomType,
+    style: params.style
+  })
+
+  const fullPrompt = assembled.finalPrompt
 
   const recipe: VersionRecipe = {
     basePrompt,
@@ -152,6 +167,9 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
       furnitureSpecId: params.furnitureSpec.id,
       roomType: params.roomType,
       style: params.style,
+      customInstructions: params.customInstructions,
+      injectorPrompts,
+      guardrailPrompts,
       fullPrompt
     }
   }

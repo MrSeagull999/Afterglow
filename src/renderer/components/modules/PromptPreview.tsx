@@ -3,6 +3,12 @@ import { Hash, Info, ArrowRight } from 'lucide-react'
 import { useModuleStore } from '../../store/useModuleStore'
 import { useAppStore } from '../../store/useAppStore'
 import type { ModuleType } from '../../../shared/types'
+import { assemblePrompt } from '../../../shared/services/prompt/promptAssembler'
+import {
+  buildCleanSlateBasePrompt,
+  buildStagingBasePrompt,
+  buildRenovateBasePrompt
+} from '../../../shared/services/prompt/prompts'
 
 interface PromptPreviewProps {
   module: ModuleType
@@ -14,6 +20,8 @@ export function PromptPreview({ module }: PromptPreviewProps) {
     stagingSettings,
     renovateSettings,
     twilightSettings,
+    injectors,
+    guardrails,
     selectedInjectorIds,
     selectedGuardrailIds
   } = useModuleStore()
@@ -24,59 +32,59 @@ export function PromptPreview({ module }: PromptPreviewProps) {
     metadata: any
   } | null>(null)
 
-  // Get module-specific settings
-  const getModuleParams = () => {
-    switch (module) {
-      case 'clean':
-        return {
-          module: 'clean',
-          customInstructions: cleanSlateSettings.customInstructions
-        }
-      case 'stage':
-        return {
-          module: 'stage',
-          roomType: stagingSettings.roomType,
-          style: stagingSettings.style,
-          customInstructions: stagingSettings.customInstructions
-        }
-      case 'renovate':
-        return {
-          module: 'renovate',
-          changes: renovateSettings.changes,
-          customInstructions: renovateSettings.customInstructions
-        }
-      case 'twilight':
-        return {
-          module: 'twilight',
-          presetId: twilightSettings.presetId,
-          lightingCondition: twilightSettings.lightingCondition,
-          customInstructions: twilightSettings.customInstructions
-        }
-      default:
-        return { module }
-    }
-  }
-
   useEffect(() => {
-    const assemblePrompt = async () => {
+    const run = async () => {
       try {
-        console.log(`[PromptPreview] Assembling prompt for module: ${module}`)
-        const params = getModuleParams()
-        console.log('[PromptPreview] Params:', params)
-        const result = await window.api.invoke('prompt:assemblePhase2', {
-          ...params,
-          injectorIds: Array.from(selectedInjectorIds),
-          guardrailIds: Array.from(selectedGuardrailIds)
+        const injectorPrompts = injectors
+          .filter((i) => selectedInjectorIds.has(i.id))
+          .map((i) => i.promptFragment)
+
+        const guardrailPrompts = guardrails
+          .filter((g: any) => selectedGuardrailIds.has(g.id))
+          .map((g: any) => g.promptFragment)
+
+        let basePrompt = ''
+        let extraInstructions = ''
+
+        if (module === 'clean') {
+          basePrompt = buildCleanSlateBasePrompt()
+          extraInstructions = cleanSlateSettings.customInstructions
+        }
+        if (module === 'stage') {
+          basePrompt = buildStagingBasePrompt({ roomType: stagingSettings.roomType, style: stagingSettings.style })
+          extraInstructions = stagingSettings.customInstructions
+        }
+        if (module === 'renovate') {
+          basePrompt = buildRenovateBasePrompt(renovateSettings.changes as any)
+          extraInstructions = renovateSettings.customInstructions
+        }
+        if (module === 'twilight') {
+          const presets = await window.electronAPI.getPresets()
+          const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
+          basePrompt = preset?.promptTemplate || ''
+          extraInstructions = twilightSettings.customInstructions
+        }
+
+        const assembled = await assemblePrompt({
+          moduleType: module,
+          basePrompt,
+          options: injectorPrompts,
+          guardrails: guardrailPrompts,
+          extraInstructions
         })
-        console.log('[PromptPreview] Result:', result)
-        setAssembledPrompt(result)
+
+        setAssembledPrompt({
+          finalPrompt: assembled.fullPrompt,
+          hash: assembled.promptHash,
+          metadata: {}
+        })
       } catch (error) {
         console.error('[PromptPreview] Failed to assemble prompt:', error)
         setAssembledPrompt(null)
       }
     }
 
-    assemblePrompt()
+    run()
   }, [
     module,
     cleanSlateSettings.customInstructions,
@@ -88,6 +96,8 @@ export function PromptPreview({ module }: PromptPreviewProps) {
     twilightSettings.presetId,
     twilightSettings.lightingCondition,
     twilightSettings.customInstructions,
+    injectors,
+    guardrails,
     selectedInjectorIds,
     selectedGuardrailIds
   ])

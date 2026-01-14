@@ -1,7 +1,7 @@
 import { readFile, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
-import type { Version, VersionStatus, VersionRecipe, ModuleType, QualityTier } from '../../../shared/types'
+import type { Version, VersionStatus, VersionRecipe, ModuleType, QualityTier, GenerationStatus } from '../../../shared/types'
 import { getJobDirectory } from './jobStore'
 import { addVersionToAsset, removeVersionFromAsset } from './assetStore'
 
@@ -19,6 +19,109 @@ function getVersionPath(jobId: string, versionId: string): string {
   return join(getJobDirectory(jobId), 'versions', `${versionId}.json`)
 }
 
+export function isVersionDeletionLocked(version: Pick<Version, 'lifecycleStatus' | 'status'>): boolean {
+  return version.lifecycleStatus === 'approved' || version.status === 'approved' || version.status === 'final_ready'
+}
+
+export function getApprovalInvariantUpdates(params: {
+  versionsForAsset: Version[]
+  approveVersionId: string
+  nowMs: number
+}): Array<{ versionId: string; updates: Partial<Version> }> {
+  const updates: Array<{ versionId: string; updates: Partial<Version> }> = []
+
+  for (const v of params.versionsForAsset) {
+    const isApproved = v.lifecycleStatus === 'approved' || v.status === 'approved'
+    if (!isApproved) continue
+
+    if (v.id !== params.approveVersionId) {
+      updates.push({
+        versionId: v.id,
+        updates: {
+          lifecycleStatus: 'draft',
+          approvedAt: undefined,
+          approvedBy: undefined,
+          status: v.status === 'approved' ? 'preview_ready' : v.status
+        }
+      })
+    }
+  }
+
+  updates.push({
+    versionId: params.approveVersionId,
+    updates: {
+      lifecycleStatus: 'approved',
+      approvedAt: params.nowMs,
+      status: 'approved'
+    }
+  })
+
+  return updates
+}
+
+export function getGenerationStatusUpdates(
+  generationStatus: GenerationStatus,
+  nowMs: number,
+  generationError?: string
+): Pick<Version, 'generationStatus' | 'startedAt' | 'completedAt' | 'generationError'> {
+  const updates: Pick<Version, 'generationStatus' | 'startedAt' | 'completedAt' | 'generationError'> = {
+    generationStatus,
+    startedAt: undefined,
+    completedAt: undefined,
+    generationError: undefined
+  }
+
+  if (generationStatus === 'pending') {
+    updates.startedAt = nowMs
+    updates.completedAt = undefined
+    updates.generationError = undefined
+  }
+
+  if (generationStatus === 'completed') {
+    updates.completedAt = nowMs
+    updates.generationError = undefined
+  }
+
+  if (generationStatus === 'failed') {
+    updates.completedAt = nowMs
+    updates.generationError = generationError
+  }
+
+  return updates
+}
+
+export function buildNewVersion(params: {
+  jobId: string
+  assetId: string
+  module: ModuleType
+  qualityTier: QualityTier
+  recipe: VersionRecipe
+  sourceVersionIds?: string[]
+  parentVersionId?: string
+  seed?: number | null
+  model?: string
+  nowMs: number
+  createdAtIso: string
+  versionId: string
+}): Version {
+  return {
+    id: params.versionId,
+    assetId: params.assetId,
+    jobId: params.jobId,
+    module: params.module,
+    qualityTier: params.qualityTier,
+    status: 'generating',
+    generationStatus: 'pending',
+    startedAt: params.nowMs,
+    recipe: params.recipe,
+    sourceVersionIds: params.sourceVersionIds || [],
+    parentVersionId: params.parentVersionId,
+    seed: params.seed,
+    model: params.model,
+    createdAt: params.createdAtIso
+  }
+}
+
 export async function createVersion(params: {
   jobId: string
   assetId: string
@@ -32,20 +135,15 @@ export async function createVersion(params: {
 }): Promise<Version> {
   const versionId = generateVersionId()
 
-  const version: Version = {
-    id: versionId,
-    assetId: params.assetId,
-    jobId: params.jobId,
-    module: params.module,
-    qualityTier: params.qualityTier,
-    status: 'generating',
-    recipe: params.recipe,
-    sourceVersionIds: params.sourceVersionIds || [],
-    parentVersionId: params.parentVersionId,
-    seed: params.seed,
-    model: params.model,
-    createdAt: new Date().toISOString()
-  }
+  const nowMs = Date.now()
+  const createdAtIso = new Date().toISOString()
+
+  const version: Version = buildNewVersion({
+    ...params,
+    nowMs,
+    createdAtIso,
+    versionId
+  })
 
   const versionPath = getVersionPath(params.jobId, versionId)
   await writeFile(versionPath, JSON.stringify(version, null, 2))
@@ -53,6 +151,17 @@ export async function createVersion(params: {
   await addVersionToAsset(params.jobId, params.assetId, versionId)
 
   return version
+}
+
+export async function setVersionGenerationStatus(
+  jobId: string,
+  versionId: string,
+  generationStatus: GenerationStatus,
+  generationError?: string
+): Promise<Version | null> {
+  const nowMs = Date.now()
+  const updates: Partial<Version> = getGenerationStatusUpdates(generationStatus, nowMs, generationError)
+  return updateVersion(jobId, versionId, updates)
 }
 
 export async function getVersion(jobId: string, versionId: string): Promise<Version | null> {
@@ -86,7 +195,7 @@ export async function deleteVersion(jobId: string, versionId: string): Promise<b
   const version = await getVersion(jobId, versionId)
   if (!version) return false
 
-  if (version.status === 'approved' || version.status === 'final_ready') {
+  if (isVersionDeletionLocked(version)) {
     return false
   }
 
@@ -111,7 +220,8 @@ export async function setVersionStatus(
   }
 
   if (status === 'approved') {
-    updates.approvedAt = new Date().toISOString()
+    updates.lifecycleStatus = 'approved'
+    updates.approvedAt = Date.now()
   }
 
   if (status === 'final_ready') {
@@ -134,8 +244,24 @@ export async function setVersionOutput(
   return updateVersion(jobId, versionId, updates)
 }
 
-export async function approveVersion(jobId: string, versionId: string): Promise<Version | null> {
-  return setVersionStatus(jobId, versionId, 'approved')
+export async function approveVersion(jobId: string, versionId: string): Promise<Version[] | null> {
+  const version = await getVersion(jobId, versionId)
+  if (!version) return null
+
+  const versionsForAsset = await listVersionsForAsset(jobId, version.assetId)
+  const updatesToApply = getApprovalInvariantUpdates({
+    versionsForAsset,
+    approveVersionId: versionId,
+    nowMs: Date.now()
+  })
+
+  const updated: Version[] = []
+  for (const u of updatesToApply) {
+    const res = await updateVersion(jobId, u.versionId, u.updates)
+    if (res) updated.push(res)
+  }
+
+  return updated.length > 0 ? updated : null
 }
 
 export async function unapproveVersion(jobId: string, versionId: string): Promise<Version | null> {
@@ -147,8 +273,10 @@ export async function unapproveVersion(jobId: string, versionId: string): Promis
   }
 
   return updateVersion(jobId, versionId, {
+    lifecycleStatus: 'draft',
     status: 'preview_ready',
-    approvedAt: undefined
+    approvedAt: undefined,
+    approvedBy: undefined
   })
 }
 
