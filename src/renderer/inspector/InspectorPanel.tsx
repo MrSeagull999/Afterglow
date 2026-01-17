@@ -8,6 +8,7 @@ import { resolveGenerationStatus } from '../../shared/resolveGenerationStatus'
 import { useInspectorTruth } from './useInspectorTruth'
 import { useJobStore } from '../store/useJobStore'
 import { BatchRunSummarySection } from './BatchRunSummarySection'
+import { useAppStore } from '../store/useAppStore'
 
 export interface InspectorPanelProps {
   activeModule: ModuleType | null
@@ -57,6 +58,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
     getViewedVersionId,
     setViewedVersionId,
     setLastAppliedVersionId,
+    loadVersionsForAsset,
+    approveVersion,
+    unapproveVersion,
     activeBatchRun,
     versionsByAssetId,
     dismissBatchRun,
@@ -65,6 +69,8 @@ export function InspectorPanel(props: InspectorPanelProps) {
     jumpToNextPendingInBatchRun,
     jumpToNextCompletedInBatchRun
   } = useJobStore()
+
+  const { addToast } = useAppStore()
 
   const viewedVersion = useMemo(() => {
     if (selectionCount !== 1) return null
@@ -88,6 +94,21 @@ export function InspectorPanel(props: InspectorPanelProps) {
     viewedVersion
   })
 
+  const canApproveViewed = !!(currentJob && viewedVersion && selectionCount === 1)
+  const canGenerateFinalViewed = !!(
+    currentJob &&
+    viewedVersion &&
+    selectionCount === 1 &&
+    (viewedVersion.status === 'approved' || viewedVersion.status === 'hq_ready')
+  )
+
+  const canRegenerateHqViewed = !!(
+    currentJob &&
+    viewedVersion &&
+    selectionCount === 1 &&
+    viewedVersion.status === 'approved'
+  )
+
   const selectionSummary = useMemo(() => {
     if (selectionCount === 0) return 'Selected: 0'
     if (selectionCount === 1) {
@@ -106,6 +127,44 @@ export function InspectorPanel(props: InspectorPanelProps) {
 
   const applyLabel = `Apply to Selected (${selectionCount})`
   const isApplyDisabled = (props.isApplyingDisabled ?? false) || selectionCount === 0 || !props.activeModule
+
+  const handleApproveViewed = async () => {
+    if (!currentJob || !viewedVersion || selectionCount !== 1) return
+    try {
+      if (viewedVersion.status === 'approved') {
+        await unapproveVersion(currentJob.id, viewedVersion.id)
+        addToast('Version unapproved', 'success')
+      } else {
+        await approveVersion(currentJob.id, viewedVersion.id)
+        addToast('Version approved', 'success')
+      }
+      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
+    } catch (error) {
+      addToast('Failed to update approval', 'error')
+    }
+  }
+
+  const handleGenerateFinalViewed = async () => {
+    if (!currentJob || !viewedVersion || selectionCount !== 1) return
+    try {
+      await window.api.invoke('version:generateFinal', currentJob.id, viewedVersion.id)
+      addToast('Final generation started', 'success')
+      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
+    } catch (error) {
+      addToast('Failed to start final generation', 'error')
+    }
+  }
+
+  const handleRegenerateHqViewed = async () => {
+    if (!currentJob || !viewedVersion || selectionCount !== 1) return
+    try {
+      await window.api.invoke('version:regenerateHQ', currentJob.id, viewedVersion.id)
+      addToast('Regenerate (HQ) started', 'success')
+      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
+    } catch (error) {
+      addToast('Failed to start HQ regenerate', 'error')
+    }
+  }
 
   useEffect(() => {
     if (!activeBatchRun || activeBatchRun.dismissed) return
@@ -265,6 +324,16 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 isPromptExpanded ? 'flex-1 min-h-[16rem] max-h-[9999px]' : 'h-64 min-h-[14rem] max-h-[32rem]'
               }`}
             />
+
+            <label className="block text-sm font-medium text-slate-300">Prompt Used (Stored on Version)</label>
+            <textarea
+              value={((viewedVersion?.recipe?.settings as any)?.fullPrompt as string | undefined) || ''}
+              readOnly
+              placeholder={viewedVersion ? 'No stored prompt found on this version.' : 'Select a generated version to see the exact stored prompt used.'}
+              className={`w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg font-mono text-xs text-slate-300 resize-y focus:outline-none ${
+                isPromptExpanded ? 'flex-1 min-h-[16rem] max-h-[9999px]' : 'h-64 min-h-[14rem] max-h-[32rem]'
+              }`}
+            />
           </div>
         </section>
 
@@ -302,6 +371,44 @@ export function InspectorPanel(props: InspectorPanelProps) {
             {props.applyTargetLabel}
           </div>
         )}
+
+        {selectionCount === 1 && currentJob && viewedVersion && (
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={handleApproveViewed}
+              disabled={!canApproveViewed}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                viewedVersion.status === 'approved'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-slate-700 hover:bg-emerald-600 text-slate-200 hover:text-white'
+              }`}
+            >
+              {viewedVersion.status === 'approved' ? 'Unapprove' : 'Approve'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRegenerateHqViewed}
+              disabled={!canRegenerateHqViewed}
+              className="px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-700 disabled:text-slate-500 text-white"
+              title="Regenerate HQ preview as a new version"
+            >
+              Regenerate (HQ)
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerateFinalViewed}
+              disabled={!canGenerateFinalViewed}
+              className="px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-amber-600 hover:bg-amber-700 disabled:bg-slate-700 disabled:text-slate-500 text-white"
+              title="Generate Final (for delivery)"
+            >
+              Generate Final
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={props.onApply}

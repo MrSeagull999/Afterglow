@@ -84,9 +84,12 @@ export async function generateVersionPreview(
     const guardrailPrompts = (version.recipe.settings.guardrailPrompts as string[] | undefined) || []
     const customInstructions = (version.recipe.settings.customInstructions as string | undefined) || ''
 
+    const previewBasePrompt =
+      (version.recipe.settings.previewBasePrompt as string | undefined) || version.recipe.basePrompt
+
     const assembled = await assemblePrompt({
       moduleType: version.module,
-      basePrompt: version.recipe.basePrompt,
+      basePrompt: previewBasePrompt,
       options: injectorPrompts,
       guardrails: guardrailPrompts,
       extraInstructions: customInstructions
@@ -126,7 +129,9 @@ export async function generateVersionPreview(
     
     // RUNTIME ASSERTION: Verify prompt hash matches what was stored in recipe
     // This ensures preview == payload (what user sees is what gets sent)
-    const storedHash = version.recipe.settings.promptHash as string | undefined
+    const storedHash =
+      (version.recipe.settings.previewPromptHash as string | undefined) ||
+      (version.recipe.settings.promptHash as string | undefined)
     if (process.env.NODE_ENV !== 'production' && storedHash && storedHash !== promptHash) {
       console.error(`[GenerateService] HASH MISMATCH DETECTED!`)
       console.error(`[GenerateService] Stored hash: ${storedHash}`)
@@ -300,9 +305,12 @@ export async function generateVersionHQPreview(
     const guardrailPrompts = (version.recipe.settings.guardrailPrompts as string[] | undefined) || []
     const customInstructions = (version.recipe.settings.customInstructions as string | undefined) || ''
 
+    const previewBasePrompt =
+      (version.recipe.settings.previewBasePrompt as string | undefined) || version.recipe.basePrompt
+
     const assembled = await assemblePrompt({
       moduleType: version.module,
-      basePrompt: version.recipe.basePrompt,
+      basePrompt: previewBasePrompt,
       options: injectorPrompts,
       guardrails: guardrailPrompts,
       extraInstructions: customInstructions
@@ -311,7 +319,11 @@ export async function generateVersionHQPreview(
     const fullPrompt = assembled.fullPrompt
 
     const seed = version.seed ?? null
-    const model = (settings as any).hqPreviewModel || settings.previewImageModel || settings.previewModel
+    const model =
+      version.model ||
+      (settings as any).hqPreviewModel ||
+      settings.previewImageModel ||
+      settings.previewModel
 
     const requestId = uuidv4()
 
@@ -423,8 +435,8 @@ export async function generateVersionFinal(
       throw new Error(`Version not found: ${versionId}`)
     }
 
-    // Allow final generation from approved or hq_ready status
-    if (version.status !== 'approved' && version.status !== 'hq_ready') {
+    // Allow final generation from approved/hq_ready versions, or from a newly created final version record.
+    if (version.qualityTier !== 'final' && version.status !== 'approved' && version.status !== 'hq_ready') {
       throw new Error('Version must be approved or HQ ready before generating final')
     }
 
@@ -484,7 +496,11 @@ export async function generateVersionFinal(
 
     // Use same seed as preview if available
     const seed = version.seed ?? null
-    const model = settings.advancedCustomModel || settings.finalModel || 'gemini-3-pro-image-preview'
+    const model =
+      version.model ||
+      settings.advancedCustomModel ||
+      settings.finalModel ||
+      'gemini-3-pro-image-preview'
 
     const requestId = uuidv4()
 
@@ -493,7 +509,9 @@ export async function generateVersionFinal(
     // PRIVACY GUARANTEE: Log only jobId and assetId
     console.log(`[GenerateService] Generating ${version.module} final for job:${jobId} asset:${asset.id} version:${versionId}`)
 
-    const storedHash = version.recipe.settings.promptHash as string | undefined
+    const storedHash =
+      (version.recipe.settings.finalPromptHash as string | undefined) ||
+      (version.recipe.settings.promptHash as string | undefined)
     if (process.env.NODE_ENV !== 'production' && storedHash && storedHash !== promptHash) {
       console.error(`[GenerateService] HASH MISMATCH DETECTED!`)
       console.error(`[GenerateService] Stored hash: ${storedHash}`)

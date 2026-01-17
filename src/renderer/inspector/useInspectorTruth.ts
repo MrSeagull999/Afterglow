@@ -5,7 +5,8 @@ import { getResolvedProviderConfig } from '../../shared/services/provider/resolv
 import {
   buildCleanSlateBasePrompt,
   buildRenovateBasePrompt,
-  buildStagingBasePrompt
+  buildStagingBasePrompt,
+  buildTwilightPreviewBasePrompt
 } from '../../shared/services/prompt/prompts'
 import { useModuleStore } from '../store/useModuleStore'
 import { useAppStore } from '../store/useAppStore'
@@ -137,7 +138,11 @@ export function useInspectorTruth(params: {
         basePrompt = buildStagingBasePrompt({ roomType: stagingSettings.roomType, style: stagingSettings.style })
       }
       if (params.moduleType === 'renovate') basePrompt = buildRenovateBasePrompt(renovateSettings.changes as any)
-      if (params.moduleType === 'twilight') basePrompt = twilightPresetTemplate
+      if (params.moduleType === 'twilight') {
+        basePrompt = twilightPresetTemplate
+          ? buildTwilightPreviewBasePrompt(twilightPresetTemplate, twilightSettings.lightingCondition)
+          : ''
+      }
 
       const result = await assemblePrompt({
         moduleType: params.moduleType,

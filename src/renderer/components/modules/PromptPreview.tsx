@@ -7,7 +7,8 @@ import { assemblePrompt } from '../../../shared/services/prompt/promptAssembler'
 import {
   buildCleanSlateBasePrompt,
   buildStagingBasePrompt,
-  buildRenovateBasePrompt
+  buildRenovateBasePrompt,
+  buildTwilightPreviewBasePrompt
 } from '../../../shared/services/prompt/prompts'
 
 interface PromptPreviewProps {
@@ -61,7 +62,9 @@ export function PromptPreview({ module }: PromptPreviewProps) {
         if (module === 'twilight') {
           const presets = await window.electronAPI.getPresets()
           const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
-          basePrompt = preset?.promptTemplate || ''
+          basePrompt = preset?.promptTemplate
+            ? buildTwilightPreviewBasePrompt(preset.promptTemplate, twilightSettings.lightingCondition)
+            : ''
           extraInstructions = twilightSettings.customInstructions
         }
 

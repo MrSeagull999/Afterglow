@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import type { Version, VersionStatus, VersionRecipe, ModuleType, QualityTier, GenerationStatus } from '../../../shared/types'
 import { getJobDirectory } from './jobStore'
 import { addVersionToAsset, removeVersionFromAsset } from './assetStore'
+import { getSettings } from '../settings'
 
 function generateVersionId(): string {
   const now = new Date()
@@ -13,6 +14,47 @@ function generateVersionId(): string {
     .slice(0, 15)
   const random = Math.random().toString(36).slice(2, 6)
   return `ver_${timestamp}_${random}`
+}
+
+export function selectFinalModel(params: {
+  advancedCustomModel?: string
+  finalModel?: string
+}): string {
+  const custom = (params.advancedCustomModel || '').trim()
+  if (custom.length > 0) return custom
+  return params.finalModel || 'gemini-3-pro-image-preview'
+}
+
+export async function createFinalFromApprovedVersion(params: {
+  jobId: string
+  approvedVersionId: string
+}): Promise<Version> {
+  const approved = await getVersion(params.jobId, params.approvedVersionId)
+  if (!approved) {
+    throw new Error(`Source version not found: ${params.approvedVersionId}`)
+  }
+
+  if (approved.status !== 'approved' && approved.status !== 'hq_ready') {
+    throw new Error('Final generation requires an approved or HQ-ready version')
+  }
+
+  const settings = await getSettings()
+  const model = selectFinalModel({
+    advancedCustomModel: settings.advancedCustomModel,
+    finalModel: settings.finalModel
+  })
+
+  return createVersion({
+    jobId: params.jobId,
+    assetId: approved.assetId,
+    module: approved.module,
+    qualityTier: 'final',
+    recipe: approved.recipe,
+    sourceVersionIds: approved.sourceVersionIds,
+    parentVersionId: approved.id,
+    seed: approved.seed ?? null,
+    model
+  })
 }
 
 function getVersionPath(jobId: string, versionId: string): string {
@@ -327,6 +369,88 @@ export async function duplicateVersion(
     parentVersionId: original.id,
     seed: original.seed,
     model: original.model
+  })
+}
+
+export function resolveHqRegenSourceVersionId(params: {
+  approvedVersion: Pick<Version, 'parentVersionId'>
+  parentVersion: Pick<Version, 'id' | 'outputPath'> | null
+}): string | null {
+  if (!params.approvedVersion.parentVersionId) return null
+  if (!params.parentVersion?.outputPath) return null
+  return params.parentVersion.id
+}
+
+export function selectHqRegenModel(params: {
+  advancedCustomModel?: string
+  previewImageModel?: string
+  previewModel?: string
+}): string {
+  const custom = (params.advancedCustomModel || '').trim()
+  if (custom.length > 0) return custom
+  return params.previewImageModel || params.previewModel || 'gemini-3-pro-image-preview'
+}
+
+export function buildHqRegenCreateVersionInput(params: {
+  approvedVersion: Pick<Version, 'id' | 'assetId' | 'module' | 'recipe' | 'seed' | 'parentVersionId'>
+  parentVersion: Pick<Version, 'id' | 'outputPath'> | null
+  model: string
+}): Pick<Parameters<typeof createVersion>[0], 'assetId' | 'module' | 'qualityTier' | 'recipe' | 'sourceVersionIds' | 'parentVersionId' | 'seed' | 'model'> {
+  const sourceVersionId = resolveHqRegenSourceVersionId({
+    approvedVersion: params.approvedVersion,
+    parentVersion: params.parentVersion
+  })
+
+  return {
+    assetId: params.approvedVersion.assetId,
+    module: params.approvedVersion.module,
+    qualityTier: 'hq_preview',
+    recipe: params.approvedVersion.recipe,
+    sourceVersionIds: sourceVersionId ? [sourceVersionId] : [],
+    parentVersionId: params.approvedVersion.id,
+    seed: params.approvedVersion.seed ?? null,
+    model: params.model
+  }
+}
+
+export async function createHQRegenVersion(params: {
+  jobId: string
+  approvedVersionId: string
+}): Promise<Version> {
+  const approved = await getVersion(params.jobId, params.approvedVersionId)
+  if (!approved) {
+    throw new Error(`Approved version not found: ${params.approvedVersionId}`)
+  }
+
+  if (approved.status !== 'approved') {
+    throw new Error('HQ regenerate requires an approved version')
+  }
+
+  const parent = approved.parentVersionId
+    ? await getVersion(params.jobId, approved.parentVersionId)
+    : null
+
+  const sourceVersionId = resolveHqRegenSourceVersionId({
+    approvedVersion: approved,
+    parentVersion: parent
+  })
+
+  const settings = await getSettings()
+  const model = selectHqRegenModel({
+    advancedCustomModel: settings.advancedCustomModel,
+    previewImageModel: settings.previewImageModel,
+    previewModel: settings.previewModel
+  })
+
+  const input = buildHqRegenCreateVersionInput({
+    approvedVersion: approved,
+    parentVersion: parent,
+    model
+  })
+
+  return createVersion({
+    jobId: params.jobId,
+    ...input
   })
 }
 

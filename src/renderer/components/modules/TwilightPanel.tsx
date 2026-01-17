@@ -16,6 +16,7 @@ export function TwilightPanel() {
   const {
     injectors,
     selectedInjectorIds,
+    selectedGuardrailIds,
     toggleInjector,
     twilightSettings,
     setTwilightSourceVersion,
@@ -68,7 +69,10 @@ export function TwilightPanel() {
         sourceVersionId: twilightSettings.sourceVersionId || undefined,
         presetId: twilightSettings.presetId,
         promptTemplate: preset.promptTemplate,
-        lightingCondition: twilightSettings.lightingCondition
+        lightingCondition: twilightSettings.lightingCondition,
+        customInstructions: twilightSettings.customInstructions,
+        injectorIds: Array.from(selectedInjectorIds),
+        customGuardrails: Array.from(selectedGuardrailIds)
       })
 
       addToast('Twilight generation started', 'success')

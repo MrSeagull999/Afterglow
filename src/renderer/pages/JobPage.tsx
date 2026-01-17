@@ -78,12 +78,15 @@ export function JobPage() {
     setViewedVersionId
   } = useJobStore()
   const { loadJobStats, jobStats } = useLibraryStore()
-  const { 
+  const {
     activeModule, 
     setActiveModule, 
     loadInjectorsForModule, 
     loadGuardrailsForModule,
-    setIsGenerating
+    setIsGenerating,
+    selectedInjectorIds,
+    selectedGuardrailIds,
+    twilightSettings
   } = useModuleStore()
   const { setView, addToast, openSettingsModal } = useAppStore()
   
@@ -118,6 +121,15 @@ export function JobPage() {
   const handleBack = () => {
     resetJobContext()
     setView('home')
+  }
+
+  const handleShowJobInFinder = async () => {
+    if (!currentJob) return
+    try {
+      await window.api.invoke('job:showInFinder', currentJob.id)
+    } catch (error) {
+      addToast('Failed to show job folder in Finder', 'error')
+    }
   }
 
   const handleApplyToSelected = async () => {
@@ -158,14 +170,45 @@ export function JobPage() {
         }
       }
       
-      const results = await window.api.invoke(`module:${activeModule}:batchGenerate`, {
+      const baseParams: any = {
         jobId: currentJob.id,
         assetIds,
-        sourceVersionIdByAssetId,
-        // Module-specific settings are read from the store by the backend
-      })
+        sourceVersionIdByAssetId
+      }
+
+      if (activeModule === 'twilight') {
+        const presets = await window.electronAPI.getPresets()
+        const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
+        baseParams.presetId = twilightSettings.presetId
+        baseParams.promptTemplate = preset?.promptTemplate || ''
+        baseParams.lightingCondition = twilightSettings.lightingCondition
+        baseParams.customInstructions = twilightSettings.customInstructions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      const results = await window.api.invoke(`module:${activeModule}:batchGenerate`, baseParams)
 
       const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
+
+      // Immediate MainStage trust fix:
+      // - set viewedVersionIdByAssetId for every selected asset
+      // - insert a pending version shell so contact tiles can show progress immediately
+      for (const assetId of assetIds) {
+        const createdId = createdVersionIdsByAssetId[assetId]
+        if (!createdId) continue
+        const sourceId = sourceVersionIdByAssetId[assetId]
+        const sourceVersionIds = sourceId ? [sourceId] : []
+        const pending = useJobStore.getState().createOptimisticPendingVersion({
+          jobId: currentJob.id,
+          assetId,
+          versionId: createdId,
+          module: activeModule,
+          sourceVersionIds
+        })
+        useJobStore.getState().upsertVersionForAsset(assetId, pending)
+        setViewedVersionId(assetId, createdId)
+      }
 
       useJobStore.getState().startBatchRun({
         moduleId: activeModule,
@@ -232,6 +275,14 @@ export function JobPage() {
             </div>
           </div>
         )}
+
+        <button
+          onClick={handleShowJobInFinder}
+          className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+          title="Show job folder in Finder"
+        >
+          <FolderOpen className="w-5 h-5 text-slate-400" />
+        </button>
 
         <button 
           onClick={openSettingsModal}

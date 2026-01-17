@@ -277,22 +277,45 @@ export function VersionCarousel() {
 
                   {/* Generate HQ Preview button - for approved versions (for chaining) */}
                   {currentVersion.status === 'approved' && (
-                    <button
-                      onClick={async () => {
-                        if (!currentJob) return
-                        try {
-                          await window.api.invoke('version:generateHQPreview', currentJob.id, currentVersion.id)
-                          addToast('HQ Preview generation started', 'success')
-                          loadVersionsForAsset(currentJob.id, currentAsset!.id)
-                        } catch (error) {
-                          addToast('Failed to start HQ generation', 'error')
-                        }
-                      }}
-                      className="p-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
-                      title="Generate HQ Preview (~3K, for chaining)"
-                    >
-                      <Zap className="w-4 h-4 text-white" />
-                    </button>
+                    <>
+                      <button
+                        onClick={async () => {
+                          if (!currentJob) return
+                          try {
+                            const newVersion = await window.api.invoke('version:regenerateHQ', currentJob.id, currentVersion.id)
+                            addToast('Regenerate (HQ) started', 'success')
+                            await loadVersionsForAsset(currentJob.id, currentAsset!.id)
+                            if (newVersion?.id) {
+                              setCurrentIndex(0)
+                              setSelectedVersionId(newVersion.id)
+                            }
+                          } catch (error) {
+                            addToast('Failed to start HQ regenerate', 'error')
+                          }
+                        }}
+                        className="p-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors"
+                        title="Regenerate (HQ) as a new version"
+                      >
+                        <Zap className="w-4 h-4 text-white" />
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (!currentJob) return
+                          try {
+                            await window.api.invoke('version:generateHQPreview', currentJob.id, currentVersion.id)
+                            addToast('HQ Preview generation started', 'success')
+                            loadVersionsForAsset(currentJob.id, currentAsset!.id)
+                          } catch (error) {
+                            addToast('Failed to start HQ generation', 'error')
+                          }
+                        }}
+                        className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+                        title="Generate HQ Preview (~3K) on this version"
+                      >
+                        <Zap className="w-4 h-4 text-slate-200" />
+                      </button>
+                    </>
                   )}
 
                   {/* Generate 4K Final button - for approved or hq_ready versions */}
@@ -301,9 +324,13 @@ export function VersionCarousel() {
                       onClick={async () => {
                         if (!currentJob) return
                         try {
-                          await window.api.invoke('version:generateFinal', currentJob.id, currentVersion.id)
+                          const newVersion = await window.api.invoke('version:generateFinal', currentJob.id, currentVersion.id)
                           addToast('4K Final generation started', 'success')
-                          loadVersionsForAsset(currentJob.id, currentAsset!.id)
+                          await loadVersionsForAsset(currentJob.id, currentAsset!.id)
+                          if (newVersion?.id) {
+                            setCurrentIndex(0)
+                            setSelectedVersionId(newVersion.id)
+                          }
                         } catch (error) {
                           addToast('Failed to start final generation', 'error')
                         }

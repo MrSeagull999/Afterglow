@@ -5,6 +5,7 @@ import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus
 import { useJobStore } from '../../store/useJobStore'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { VersionDots, type VersionDotState } from './VersionDots'
+import { MainStageTile } from './MainStageTile'
 
 export type MainStageBatchView = 'contact' | 'focused'
 
@@ -346,8 +347,12 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
       const updates: Record<string, string | null> = {}
       for (const asset of selectedAssets) {
         if (cancelled) return
+        const viewedId = getViewedVersionId(asset.id)
+        const versions = getAssetVersions(asset.id)
+        const viewed = viewedId ? versions.find((v) => v.id === viewedId) || null : null
+        const inputPath = viewed?.outputPath || asset.originalPath
         try {
-          const url = await electronAPI.readImageAsDataURL(asset.originalPath)
+          const url = await electronAPI.readImageAsDataURL(inputPath)
           updates[asset.id] = url
         } catch {
           updates[asset.id] = null
@@ -480,30 +485,20 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
               {selectedAssets.map((asset) => {
                 const thumb = contactThumbs[asset.id]
                 const label = asset.displayName || asset.name
+                const viewedId = getViewedVersionId(asset.id)
+                const versions = getAssetVersions(asset.id)
+                const viewed = viewedId ? versions.find((v) => v.id === viewedId) || null : null
                 return (
-                  <button
+                  <MainStageTile
                     key={asset.id}
-                    type="button"
-                    title={label}
+                    asset={asset}
+                    viewedVersion={viewed}
+                    thumbDataUrl={thumb || null}
                     onClick={() => {
                       setFocusedAssetId(asset.id)
                       setBatchView('focused')
                     }}
-                    className="group relative rounded-lg border border-slate-700 bg-slate-900 overflow-hidden hover:border-slate-500 transition-colors"
-                  >
-                    <div className="aspect-square bg-slate-950">
-                      {thumb ? (
-                        <img src={thumb} alt={label} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">
-                          Preview
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1">
-                      <div className="text-[11px] text-slate-200 truncate">{label}</div>
-                    </div>
-                  </button>
+                  />
                 )
               })}
             </div>

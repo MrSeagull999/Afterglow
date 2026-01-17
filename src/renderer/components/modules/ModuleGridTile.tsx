@@ -27,6 +27,8 @@ interface ModuleGridTileProps {
   viewMode: 'grid' | 'list'
   versionProgress: Record<string, number>
   onToggleSelect: () => void
+  onReplaceSelect?: () => void
+  onAddToSelect?: () => void
   onToggleExpand: () => void
   onCompare?: (originalPath: string, outputPath: string) => void
   libraryThumbOnly?: boolean
@@ -60,6 +62,8 @@ export function ModuleGridTile({
   viewMode,
   versionProgress,
   onToggleSelect,
+  onReplaceSelect,
+  onAddToSelect,
   onToggleExpand,
   onCompare,
   libraryThumbOnly = false
@@ -127,6 +131,24 @@ export function ModuleGridTile({
   const resolvedLatestGenerationStatus = resolveGenerationStatus(latestVersion)
   const isGenerating = resolvedLatestGenerationStatus === 'pending'
   const isFailed = resolvedLatestGenerationStatus === 'failed'
+
+  const handleTileBodyClick = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      if (isSelected) {
+        onToggleSelect()
+        return
+      }
+      if (onAddToSelect) {
+        onAddToSelect()
+        return
+      }
+    }
+    if (onReplaceSelect) {
+      onReplaceSelect()
+      return
+    }
+    onToggleSelect()
+  }
 
   const handleApprove = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -210,11 +232,18 @@ export function ModuleGridTile({
   if (viewMode === 'grid') {
     if (libraryThumbOnly) {
       return (
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           data-testid="library-thumb"
-          onClick={onToggleSelect}
-          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all bg-slate-900 ${
+          onClick={handleTileBodyClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleTileBodyClick(e as unknown as React.MouseEvent)
+            }
+          }}
+          className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all bg-slate-900 cursor-pointer ${
             isSelected
               ? 'border-blue-500 ring-2 ring-blue-500/30'
               : 'border-slate-800 hover:border-slate-600'
@@ -243,23 +272,31 @@ export function ModuleGridTile({
             </div>
           )}
 
-          <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-            isSelected ? 'bg-blue-500 border-blue-500' : 'border-white/60 bg-black/30'
-          }`}>
+          <button
+            type="button"
+            aria-label={isSelected ? 'Deselect' : 'Select'}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelect()
+            }}
+            className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+              isSelected ? 'bg-blue-500 border-blue-500' : 'border-white/60 bg-black/30'
+            }`}
+          >
             {isSelected && <Check className="w-3 h-3 text-white" />}
-          </div>
+          </button>
 
           <div className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1">
             <div className="text-[11px] text-slate-200 truncate" title={asset.name}>{asset.name}</div>
           </div>
-        </button>
+        </div>
       )
     }
 
     return (
       <div className="flex flex-col">
         <div
-          onClick={onToggleSelect}
+          onClick={handleTileBodyClick}
           className={`relative bg-slate-800 rounded-lg overflow-hidden border-2 transition-all cursor-pointer group ${
             isSelected 
               ? 'border-blue-500 ring-2 ring-blue-500/30' 
@@ -295,13 +332,21 @@ export function ModuleGridTile({
             )}
 
             {/* Selection checkbox */}
-            <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-              isSelected 
-                ? 'bg-blue-500 border-blue-500' 
-                : 'border-white/50 bg-black/30 opacity-0 group-hover:opacity-100'
-            }`}>
+            <button
+              type="button"
+              aria-label={isSelected ? 'Deselect' : 'Select'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSelect()
+              }}
+              className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                isSelected 
+                  ? 'bg-blue-500 border-blue-500' 
+                  : 'border-white/50 bg-black/30 opacity-0 group-hover:opacity-100'
+              }`}
+            >
               {isSelected && <Check className="w-3 h-3 text-white" />}
-            </div>
+            </button>
 
             {/* Status badge */}
             <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded text-xs font-medium text-white ${statusConfig.color}`}>

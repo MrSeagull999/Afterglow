@@ -37,6 +37,52 @@ export function buildStagingBasePrompt(params: { roomType: string; style: string
 11) Furniture placement should feel natural and allow for realistic traffic flow through the space.`
 }
 
+export function buildTwilightPreviewBasePrompt(
+  presetPromptTemplate: string,
+  lightingCondition?: 'overcast' | 'sunny'
+): string {
+  const lightingModifier =
+    lightingCondition === 'sunny'
+      ? `IMPORTANT LIGHTING CORRECTION STEP:
+Before applying twilight or evening lighting, remove all visual evidence of direct sunlight.
+- Neutralize harsh midday shadows caused by overhead sun.
+- Reduce strong highlight contrast on roofs, paving, foliage, and walls.
+- Soften specular highlights and sunlit hotspots.
+- Ensure lighting appears evenly diffused, as if the sun has already dropped below the horizon.
+
+All shadows must be recalculated to match dusk conditions:
+- No hard or directional midday shadows.
+- Shadows should be soft, low-contrast, and consistent with ambient twilight.`
+      : ''
+
+  const guard = `This is a truth-preserving twilight conversion of the provided photograph. Do not reinterpret the scene.
+
+Window rule: Treat windows as light-emitting planes, not viewports. Windows may glow softly but must remain indistinct and non-descriptive.
+- Do NOT show interior objects, furniture, silhouettes, people, room layouts, or any visible room contents through windows.
+- Interior light should be diffuse and uniform; avoid directional beams, visible edges, shapes, or interior structure.
+
+Exterior lighting rule: Do NOT invent exterior/garden/landscape lighting (path lights, uplights, wall washers, glowing plants).
+- Only show exterior lighting if a physical lighting fixture is clearly visible in the original image.
+- If the source of light is unclear, reduce intensity rather than inventing a source.
+
+Warmth guidance: Maintain a warm, inviting interior glow, biased toward neutral warm-white (not saturated orange). Keep color natural and balanced.
+
+Ambiguity rule: If unsure, do nothing. Do not add details to unclear/occluded areas; darkness is acceptable. Higher resolution must not increase semantic detail.`
+
+  const presetAlreadyContainsGuard =
+    /truth-preserving twilight conversion/i.test(presetPromptTemplate) ||
+    /Treat windows as light-emitting planes, not viewports/i.test(presetPromptTemplate) ||
+    /Do NOT invent exterior\/garden\/landscape lighting/i.test(presetPromptTemplate) ||
+    /Ambiguity rule: If unsure, do nothing/i.test(presetPromptTemplate) ||
+    /neutral warm-white/i.test(presetPromptTemplate)
+
+  const parts: string[] = []
+  if (lightingModifier) parts.push(lightingModifier)
+  if (!presetAlreadyContainsGuard) parts.push(guard)
+  parts.push(presetPromptTemplate)
+  return parts.join('\n\n')
+}
+
 export interface RenovateChanges {
   floor?: {
     enabled: boolean

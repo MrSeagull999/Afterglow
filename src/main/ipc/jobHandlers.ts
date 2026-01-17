@@ -1,11 +1,12 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import type { Job, JobMetadata, Scene, Asset } from '../../shared/types'
 import {
   createJob,
   getJob,
   updateJob,
   deleteJob,
-  listJobs
+  listJobs,
+  getJobDirectory
 } from '../core/store/jobStore'
 import {
   createScene,
@@ -46,6 +47,11 @@ export function registerJobHandlers(): void {
 
   ipcMain.handle('job:list', async () => {
     return listJobs()
+  })
+
+  ipcMain.handle('job:showInFinder', async (_event, jobId: string) => {
+    const jobDir = getJobDirectory(jobId)
+    shell.showItemInFolder(jobDir)
   })
 
   // Scene CRUD

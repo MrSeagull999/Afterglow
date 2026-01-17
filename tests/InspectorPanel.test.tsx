@@ -104,6 +104,7 @@ test('InspectorPanel no-regression: prompt preview + hash exist', () => {
 
   assert.ok(html.includes('PROMPT TRUTH'))
   assert.ok(html.includes('Final Prompt (Live)'))
+  assert.ok(html.includes('Prompt Used (Stored on Version)'))
   assert.ok(html.includes('promptHash'))
 })
 

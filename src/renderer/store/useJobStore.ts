@@ -154,6 +154,8 @@ interface JobState {
   createAsset: (jobId: string, sceneId: string | undefined, name: string, sourcePath: string) => Promise<Asset>
   updateAsset: (jobId: string, assetId: string, updates: Partial<Asset>) => Promise<void>
   deleteAsset: (jobId: string, assetId: string) => Promise<void>
+  replaceAssetSelection: (assetId: string) => void
+  addAssetToSelection: (assetId: string) => void
   toggleAssetSelection: (assetId: string) => void
   selectAllAssets: () => void
   deselectAllAssets: () => void
@@ -175,6 +177,16 @@ interface JobState {
   setViewedVersionId: (assetId: string, versionId: string | null) => void
   setLastAppliedVersionId: (assetId: string, versionId: string | null) => void
   getLastAppliedVersionId: (assetId: string) => string | null
+
+  // Optimistic version insertion (used for immediate UI feedback during batch apply)
+  upsertVersionForAsset: (assetId: string, version: Version) => void
+  createOptimisticPendingVersion: (params: {
+    jobId: string
+    assetId: string
+    versionId: string
+    module: ModuleType
+    sourceVersionIds: string[]
+  }) => Version
 
   // Batch Run
   startBatchRun: (params: {
@@ -353,6 +365,18 @@ export const useJobStore = create<JobState>((set, get) => ({
     }))
   },
 
+  replaceAssetSelection: (assetId) =>
+    set(() => ({
+      selectedAssetIds: new Set([assetId])
+    })),
+
+  addAssetToSelection: (assetId) =>
+    set((state) => {
+      const next = new Set(state.selectedAssetIds)
+      next.add(assetId)
+      return { selectedAssetIds: next }
+    }),
+
   toggleAssetSelection: (assetId) =>
     set((state) => {
       const newSelected = new Set(state.selectedAssetIds)
@@ -478,6 +502,33 @@ export const useJobStore = create<JobState>((set, get) => ({
 
   getLastAppliedVersionId: (assetId) => {
     return get().lastAppliedVersionIdByAssetId[assetId] || null
+  },
+
+  upsertVersionForAsset: (assetId, version) =>
+    set((state) => {
+      const existing = state.versionsByAssetId[assetId] || []
+      const idx = existing.findIndex((v) => v.id === version.id)
+      const next = idx >= 0 ? existing.map((v) => (v.id === version.id ? version : v)) : [...existing, version]
+      return {
+        versionsByAssetId: { ...state.versionsByAssetId, [assetId]: next }
+      }
+    }),
+
+  createOptimisticPendingVersion: (params) => {
+    const now = Date.now()
+    return {
+      id: params.versionId,
+      assetId: params.assetId,
+      jobId: params.jobId,
+      module: params.module,
+      qualityTier: 'preview',
+      status: 'generating',
+      generationStatus: 'pending',
+      startedAt: now,
+      recipe: { basePrompt: '', injectors: [], guardrails: [], settings: {} },
+      sourceVersionIds: params.sourceVersionIds,
+      createdAt: new Date(now).toISOString()
+    } as Version
   },
 
   startBatchRun: (params) =>

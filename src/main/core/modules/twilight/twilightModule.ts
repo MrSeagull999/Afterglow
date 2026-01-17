@@ -11,7 +11,9 @@ import {
   getThumbnailPath
 } from '../shared/moduleRunner'
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../shared/guardrails'
+import { buildInjectorPromptFromIds } from '../shared/injectorRegistry'
 import { PromptAssembler } from '../../services/prompt/promptAssembler'
+import { buildTwilightPreviewBasePrompt } from '../../../../shared/services/prompt/prompts'
 
 export interface TwilightParams {
   jobId: string
@@ -20,6 +22,9 @@ export interface TwilightParams {
   presetId: string
   promptTemplate: string
   lightingCondition?: 'overcast' | 'sunny'
+  injectorIds?: string[]
+  customGuardrails?: string[]
+  customInstructions?: string
   model?: string
   seed?: number | null
 }
@@ -38,32 +43,51 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
     }
   }
 
-  const guardrailIds = getDefaultGuardrailIds('twilight')
+  const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('twilight')
+  const injectorIds = params.injectorIds || []
+  const customInstructions = params.customInstructions?.trim() || ''
+
   const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
-  const injectorPrompts: string[] = []
+  const injectorPrompt = await buildInjectorPromptFromIds('twilight', injectorIds)
+  const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
+
+  const finalBasePrompt = params.promptTemplate
+  const previewBasePrompt = buildTwilightPreviewBasePrompt(params.promptTemplate, params.lightingCondition)
+
+  const assembledFinal = await PromptAssembler.assemble({
+    module: 'twilight',
+    basePrompt: finalBasePrompt,
+    injectorPrompts,
+    guardrailPrompts,
+    customInstructions
+  })
 
   // Use PromptAssembler for consistent prompt building and hash generation
-  const assembled = await PromptAssembler.assemble({
+  const assembledPreview = await PromptAssembler.assemble({
     module: 'twilight',
-    basePrompt: params.promptTemplate,
+    basePrompt: previewBasePrompt,
     injectorPrompts,
-    guardrailPrompts
+    guardrailPrompts,
+    customInstructions
   })
   
-  const fullPrompt = assembled.finalPrompt
+  const fullPrompt = assembledPreview.finalPrompt
 
   const recipe: VersionRecipe = {
-    basePrompt: params.promptTemplate,
-    injectors: [],
+    basePrompt: finalBasePrompt,
+    injectors: injectorIds,
     guardrails: guardrailIds,
     settings: {
       inputPath,
       presetId: params.presetId,
       lightingCondition: params.lightingCondition,
+      previewBasePrompt,
+      customInstructions,
       injectorPrompts,
       guardrailPrompts,
       fullPrompt,
-      promptHash: assembled.hash
+      previewPromptHash: assembledPreview.hash,
+      finalPromptHash: assembledFinal.hash
     }
   }
 

@@ -30,6 +30,8 @@ export function ModuleGrid({ activeModule, libraryMode = false }: ModuleGridProp
     assets,
     versions,
     selectedAssetIds,
+    replaceAssetSelection,
+    addAssetToSelection,
     toggleAssetSelection,
     selectAllAssets,
     deselectAllAssets,
@@ -366,6 +368,8 @@ export function ModuleGrid({ activeModule, libraryMode = false }: ModuleGridProp
                 viewMode={libraryMode ? 'grid' : viewMode}
                 versionProgress={versionProgress}
                 onToggleSelect={() => toggleAssetSelection(asset.id)}
+                onReplaceSelect={() => replaceAssetSelection(asset.id)}
+                onAddToSelect={() => addAssetToSelection(asset.id)}
                 onToggleExpand={() => handleToggleExpand(asset.id)}
                 onCompare={handleCompare}
                 libraryThumbOnly={libraryMode}

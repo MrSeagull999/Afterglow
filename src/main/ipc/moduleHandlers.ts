@@ -6,6 +6,8 @@ import type { ModuleType } from '../../shared/types'
 import { generationLogger } from '../core/services/generation/generationLogger'
 import { getSettings } from '../core/settings'
 import { getResolvedProviderConfig } from '../../shared/services/provider/resolvedProviderConfig'
+import { getPreset } from '../core/promptBank'
+import { createFinalFromApprovedVersion } from '../core/store/versionStore'
 
 import {
   generateCleanSlatePreview,
@@ -120,11 +122,20 @@ export function registerModuleHandlers(): void {
   })
 
   // Generate final for any module
-  ipcMain.handle('version:generateFinal', async (_event, jobId: string, versionId: string) => {
-    generateVersionFinal(jobId, versionId, (progress) => {
-      sendProgress(versionId, progress)
+  ipcMain.handle('version:generateFinal', async (_event, ...args: any[]) => {
+    const jobId = typeof args[0] === 'string' ? (args[0] as string) : (args[0]?.jobId as string)
+    const approvedVersionId = typeof args[0] === 'string' ? (args[1] as string) : (args[0]?.versionId as string)
+
+    const version = await createFinalFromApprovedVersion({
+      jobId,
+      approvedVersionId
+    })
+
+    generateVersionFinal(jobId, version.id, (progress) => {
+      sendProgress(version.id, progress)
     }).catch(err => console.error('[Final] Generation error:', err))
-    return { started: true }
+
+    return version
   })
 
   // Furniture Spec handlers
@@ -282,12 +293,30 @@ export function registerModuleHandlers(): void {
     promptTemplate?: string
     lightingCondition?: 'overcast' | 'sunny'
     sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+    customInstructions?: string
   }) => {
-    const { jobId, assetIds, presetId, promptTemplate, lightingCondition, sourceVersionIdByAssetId } = params
+    const {
+      jobId,
+      assetIds,
+      presetId,
+      promptTemplate,
+      lightingCondition,
+      sourceVersionIdByAssetId,
+      injectorIds,
+      guardrailIds,
+      customInstructions
+    } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
-    // Default prompt template if not provided
-    const template = promptTemplate || 'Transform this daytime exterior photo into a stunning twilight/dusk scene. The sky should show deep blue hour colors with warm orange and pink tones near the horizon. All interior lights should be warmly lit, glowing invitingly through windows. Exterior landscape lighting should be on. Maintain all architectural details exactly as shown.'
+    const effectivePresetId = presetId || 'twilight_exterior_classic'
+    const preset = await getPreset(effectivePresetId)
+    const template = promptTemplate || preset?.promptTemplate || ''
+
+    if (!template || template.trim().length === 0) {
+      throw new Error(`Twilight batchGenerate missing promptTemplate and preset not found/empty: ${effectivePresetId}`)
+    }
 
     for (const assetId of assetIds) {
       try {
@@ -295,9 +324,12 @@ export function registerModuleHandlers(): void {
           jobId,
           assetId,
           sourceVersionId: sourceVersionIdByAssetId?.[assetId],
-          presetId: presetId || 'twilight_exterior_classic',
+          presetId: effectivePresetId,
           promptTemplate: template,
-          lightingCondition: lightingCondition || 'overcast'
+          lightingCondition: lightingCondition || 'overcast',
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || [],
+          customInstructions: customInstructions || ''
         })
         
         generateVersionPreview(jobId, version.id, (progress) => {

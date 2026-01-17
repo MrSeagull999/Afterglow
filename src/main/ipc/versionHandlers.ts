@@ -1,9 +1,10 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import type { VersionStatus, ModuleType, VersionRecipe } from '../../shared/types'
-import { generateVersionPreview } from '../core/modules/shared/generateService'
+import { generateVersionHQPreview, generateVersionPreview } from '../core/modules/shared/generateService'
 import { exportVersion } from '../export/exportVersion'
 import {
   createVersion,
+  createHQRegenVersion,
   getVersion,
   updateVersion,
   deleteVersion,
@@ -100,6 +101,16 @@ export function registerVersionHandlers(): void {
     generateVersionPreview(params.jobId, version.id, (progress) => {
       sendProgress(version.id, progress)
     }).catch((err) => console.error('[Version Retry] Generation error:', err))
+
+    return version
+  })
+
+  ipcMain.handle('version:regenerateHQ', async (_event, jobId: string, approvedVersionId: string) => {
+    const version = await createHQRegenVersion({ jobId, approvedVersionId })
+
+    generateVersionHQPreview(jobId, version.id, (progress) => {
+      sendProgress(version.id, progress)
+    }).catch((err) => console.error('[HQ Regenerate] Generation error:', err))
 
     return version
   })
