@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { Asset, ModuleType } from '../../shared/types'
+import { CostEstimateDisplay, SingleGenerationCostBadge } from '../components/CostEstimateDisplay'
 import { TwilightSettings } from '../components/modules/settings/TwilightSettings'
 import { CleanSlateSettings } from '../components/modules/settings/CleanSlateSettings'
 import { StagingSettings } from '../components/modules/settings/StagingSettings'
@@ -16,6 +17,7 @@ export interface InspectorPanelProps {
   assets: Asset[]
   applyTargetLabel?: string
   onApply: () => void
+  onApplyHQ?: () => void
   isApplyingDisabled?: boolean
 }
 
@@ -109,6 +111,13 @@ export function InspectorPanel(props: InspectorPanelProps) {
     viewedVersion.status === 'approved'
   )
 
+  const canGenerateNative4K = !!(
+    currentJob &&
+    viewedVersion &&
+    selectionCount === 1 &&
+    viewedVersion.status === 'approved'
+  )
+
   const selectionSummary = useMemo(() => {
     if (selectionCount === 0) return 'Selected: 0'
     if (selectionCount === 1) {
@@ -165,6 +174,53 @@ export function InspectorPanel(props: InspectorPanelProps) {
       addToast('Failed to start HQ regenerate', 'error')
     }
   }
+
+  const handleGenerateNative4K = async () => {
+    if (!currentJob || !viewedVersion || selectionCount !== 1) return
+    try {
+      await window.api.invoke('version:generateNative4K', currentJob.id, viewedVersion.id)
+      addToast('Native 4K generation started', 'success')
+      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
+    } catch (error) {
+      addToast('Failed to start Native 4K generation', 'error')
+    }
+  }
+
+  const handleUseAsSource = async () => {
+    if (!currentJob || !viewedVersion || selectionCount !== 1) return
+    try {
+      await window.api.invoke('asset:setWorkingSource', {
+        jobId: currentJob.id,
+        assetId: props.selectedAssetIds[0],
+        versionId: viewedVersion.id
+      })
+      addToast('Set as working source for other modules', 'success')
+    } catch (error) {
+      addToast('Failed to set working source', 'error')
+    }
+  }
+
+  const handleClearWorkingSource = async () => {
+    if (!currentJob || selectionCount !== 1) return
+    try {
+      await window.api.invoke('asset:setWorkingSource', {
+        jobId: currentJob.id,
+        assetId: props.selectedAssetIds[0],
+        versionId: null
+      })
+      addToast('Reverted to original source', 'success')
+    } catch (error) {
+      addToast('Failed to clear working source', 'error')
+    }
+  }
+
+  // Check if viewed version has output and can be used as source
+  const canUseAsSource = !!(
+    currentJob &&
+    viewedVersion &&
+    selectionCount === 1 &&
+    viewedVersion.outputPath
+  )
 
   useEffect(() => {
     if (!activeBatchRun || activeBatchRun.dismissed) return
@@ -362,6 +418,15 @@ export function InspectorPanel(props: InspectorPanelProps) {
             </div>
           )}
         </section>
+
+        {/* 7) Cost Reference */}
+        <section data-testid="section-cost" className="p-4 bg-slate-900 border border-slate-700 rounded-lg space-y-2 min-w-0">
+          <div className="text-[11px] tracking-wide text-slate-200 font-semibold">COST REFERENCE</div>
+          <CostEstimateDisplay 
+            showPerImageCosts={true}
+            previewCount={selectionCount > 0 ? selectionCount : 0}
+          />
+        </section>
       </div>
 
       {/* 7) Primary Action */}
@@ -372,6 +437,32 @@ export function InspectorPanel(props: InspectorPanelProps) {
           </div>
         )}
 
+        {/* Generation Buttons - Preview and HQ Preview */}
+        <div className="flex gap-2 mb-3">
+          <button
+            type="button"
+            onClick={props.onApply}
+            disabled={isApplyDisabled}
+            className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
+            title="Generate quick preview (~$0.04/image)"
+          >
+            <div className="text-sm font-medium">Preview</div>
+            <div className="text-xs text-blue-200">~$0.04</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={props.onApplyHQ}
+            disabled={isApplyDisabled || !props.onApplyHQ}
+            className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
+            title="Generate HQ preview with Nano Banana Pro 2K (~$0.13/image) - preview what 4K will look like"
+          >
+            <div className="text-sm font-medium">HQ Preview (2K)</div>
+            <div className="text-xs text-purple-200">~$0.13</div>
+          </button>
+        </div>
+
+        {/* Version Actions - Approve, 4K, Use as Source */}
         {selectionCount === 1 && currentJob && viewedVersion && (
           <div className="flex items-center gap-2 mb-3">
             <button
@@ -387,36 +478,32 @@ export function InspectorPanel(props: InspectorPanelProps) {
               {viewedVersion.status === 'approved' ? 'Unapprove' : 'Approve'}
             </button>
 
-            <button
-              type="button"
-              onClick={handleRegenerateHqViewed}
-              disabled={!canRegenerateHqViewed}
-              className="px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-700 disabled:text-slate-500 text-white"
-              title="Regenerate HQ preview as a new version"
-            >
-              Regenerate (HQ)
-            </button>
-
-            <button
-              type="button"
-              onClick={handleGenerateFinalViewed}
-              disabled={!canGenerateFinalViewed}
-              className="px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-amber-600 hover:bg-amber-700 disabled:bg-slate-700 disabled:text-slate-500 text-white"
-              title="Generate Final (for delivery)"
-            >
-              Generate Final
-            </button>
+            {canGenerateNative4K && (
+              <button
+                type="button"
+                onClick={handleGenerateNative4K}
+                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-amber-600 hover:bg-amber-700 text-white"
+                title="Generate true 4K version (3840×2160) using native model resolution"
+              >
+                <div className="text-sm font-medium">Generate 4K</div>
+                <div className="text-xs text-amber-200">~$0.24</div>
+              </button>
+            )}
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={props.onApply}
-          disabled={isApplyDisabled}
-          className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
-        >
-          {applyLabel}
-        </button>
+        {canUseAsSource && (
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={handleUseAsSource}
+              className="w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-teal-600 hover:bg-teal-700 text-white"
+              title="Use this version's output as the base image for other modules (e.g., use decluttered 4K for staging)"
+            >
+              Use as Source for Other Modules
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )

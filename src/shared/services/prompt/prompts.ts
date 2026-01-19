@@ -22,10 +22,55 @@ export function buildCleanSlateBasePrompt(): string {
 9) Maintain the exact same camera angle and perspective.`
 }
 
-export function buildStagingBasePrompt(params: { roomType: string; style: string }): string {
-  return `Virtually stage this empty ${params.roomType} with realistic, high-quality furniture and decor in a ${params.style} style. Requirements:
-1) Add appropriate furniture for a ${params.roomType}: select pieces that are proportional to the space and professionally arranged.
-2) Use a cohesive ${params.style} design aesthetic throughout - furniture, textiles, and accessories should complement each other.
+// Room-specific furniture constraints (must match stagingPrompts.ts)
+const ROOM_FURNITURE_CONSTRAINTS: Record<string, string> = {
+  'small bedroom': 'Use only a SINGLE bed (not queen or king). Include minimal furniture: one small nightstand, and optionally a small dresser or desk. Do not overcrowd the space.',
+  "children's bedroom": 'Use child-appropriate furniture: a single or bunk bed, child-sized desk, toy storage, and playful but tasteful decor. Furniture should be safe with rounded edges.',
+  'nursery': 'Include a crib, changing table, comfortable nursing chair, and soft storage. Use calming colors and child-safe furniture.',
+  'studio apartment': 'Use space-efficient furniture that serves multiple purposes. Include a sofa bed or murphy bed, compact dining area, and smart storage solutions.',
+  'home office': 'Include a desk, ergonomic office chair, and appropriate storage. Ensure good lighting for work.',
+  'master bedroom': 'Use a king or queen bed as the focal point with matching nightstands. Include a seating area if space permits.',
+  'guest bedroom': 'Use a queen bed with simple, welcoming decor. Keep furniture minimal but comfortable.',
+  'bedroom': 'Use a queen or double bed with nightstands. Include a dresser if space permits.',
+  'living room': 'Include a sofa as the main seating, with accent chairs, coffee table, and side tables. Arrange furniture to create a conversational grouping.',
+  'dining room': 'Include a dining table with chairs appropriately sized for the space. A 6-seater table for medium rooms, 4-seater for smaller spaces.',
+  'kitchen': 'If space permits, add bar stools at a counter or island. Keep staging minimal to showcase the kitchen itself.',
+  'family room': 'Use comfortable, durable furniture suitable for family use. Include ample seating and a media console if appropriate.',
+  'media room': 'Include comfortable seating oriented toward where a TV/screen would be. Consider a sectional sofa or theater-style seating.',
+  'bathroom': 'Add minimal staging - towels, bath mat, and small decorative items only. Do not add furniture.',
+  'open-plan living/dining': 'Define distinct zones for living and dining with furniture placement. Use a rug to anchor the living area and ensure visual flow between spaces.'
+}
+
+export interface StagingPromptParams {
+  roomType: string
+  style: string
+  roomDimensions?: {
+    enabled: boolean
+    width: string
+    length: string
+    unit: 'feet' | 'meters'
+  }
+}
+
+export function buildStagingBasePrompt(params: StagingPromptParams): string {
+  const { roomType, style, roomDimensions } = params
+  
+  // Build room dimensions instruction if provided
+  let dimensionsInstruction = ''
+  if (roomDimensions?.enabled && roomDimensions.width && roomDimensions.length) {
+    const unit = roomDimensions.unit === 'meters' ? 'meters' : 'feet'
+    dimensionsInstruction = `\n\nROOM DIMENSIONS: This room is approximately ${roomDimensions.width} × ${roomDimensions.length} ${unit}. Scale all furniture realistically to these dimensions. Do not shrink furniture to fit - if standard furniture would not fit, use fewer or smaller appropriate pieces instead.`
+  }
+  
+  // Get room-specific furniture constraints
+  const furnitureConstraint = ROOM_FURNITURE_CONSTRAINTS[roomType] || ''
+  const furnitureInstruction = furnitureConstraint ? `\n\nFURNITURE REQUIREMENTS FOR ${roomType.toUpperCase()}: ${furnitureConstraint}` : ''
+
+  return `Virtually stage this empty ${roomType} with realistic, high-quality furniture and decor in a ${style} style.${dimensionsInstruction}${furnitureInstruction}
+
+Requirements:
+1) Add appropriate furniture for a ${roomType}: select pieces that are proportional to the space and professionally arranged.
+2) Use a cohesive ${style} design aesthetic throughout - furniture, textiles, and accessories should complement each other.
 3) Include realistic soft furnishings: rugs, cushions, throws, and curtains where appropriate.
 4) Add tasteful decor: artwork, plants, lamps, and decorative objects that enhance the space without cluttering.
 5) Ensure all furniture is properly grounded with realistic shadows and reflections.
@@ -34,7 +79,8 @@ export function buildStagingBasePrompt(params: { roomType: string; style: string
 8) Maintain consistent lighting that matches the original photograph.
 9) The result must be photorealistic and suitable for professional real estate marketing.
 10) Maintain the exact same camera angle and perspective.
-11) Furniture placement should feel natural and allow for realistic traffic flow through the space.`
+11) Furniture placement should feel natural and allow for realistic traffic flow through the space.
+12) All furniture must be realistically scaled - do not miniaturize or shrink furniture to fit the space.`
 }
 
 export function buildTwilightPreviewBasePrompt(

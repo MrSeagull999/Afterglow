@@ -1,13 +1,15 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { loadInjectorsForModule, reloadInjectors } from '../core/modules/shared/injectorRegistry'
 import { getGuardrailsForModule, ARCHITECTURAL_GUARDRAILS, buildGuardrailPrompt } from '../core/modules/shared/guardrails'
-import { generateVersionPreview, generateVersionHQPreview, generateVersionFinal } from '../core/modules/shared/generateService'
+import { generateVersionPreview, generateVersionHQPreview, generateVersionFinal, generateVersionNative4K } from '../core/modules/shared/generateService'
 import type { ModuleType } from '../../shared/types'
 import { generationLogger } from '../core/services/generation/generationLogger'
+import { estimateExtendedCost, getCostPerImage } from '../core/costEstimate'
 import { getSettings } from '../core/settings'
 import { getResolvedProviderConfig } from '../../shared/services/provider/resolvedProviderConfig'
 import { getPreset } from '../core/promptBank'
-import { createFinalFromApprovedVersion } from '../core/store/versionStore'
+import { createFinalFromApprovedVersion, createNative4KFromApprovedVersion } from '../core/store/versionStore'
+import { setWorkingSource } from '../core/store/assetStore'
 
 import {
   generateCleanSlatePreview,
@@ -138,6 +140,20 @@ export function registerModuleHandlers(): void {
     return version
   })
 
+  // Generate Native 4K version from approved version
+  ipcMain.handle('version:generateNative4K', async (_event, jobId: string, approvedVersionId: string) => {
+    const version = await createNative4KFromApprovedVersion({
+      jobId,
+      approvedVersionId
+    })
+
+    generateVersionNative4K(jobId, version.id, (progress) => {
+      sendProgress(version.id, progress)
+    }).catch(err => console.error('[Native 4K] Generation error:', err))
+
+    return version
+  })
+
   // Furniture Spec handlers
   ipcMain.handle('furnitureSpec:create', async (_event, params: {
     jobId: string
@@ -209,12 +225,13 @@ export function registerModuleHandlers(): void {
     assetIds: string[]
     roomType?: string
     style?: string
+    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters' }
     sourceVersionId?: string
     sourceVersionIdByAssetId?: Record<string, string>
     injectorIds?: string[]
     guardrailIds?: string[]
   }) => {
-    const { jobId, assetIds, roomType, style, sourceVersionId, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
+    const { jobId, assetIds, roomType, style, roomDimensions, sourceVersionId, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
     for (const assetId of assetIds) {
@@ -228,6 +245,7 @@ export function registerModuleHandlers(): void {
           sourceVersionId: source,
           roomType: roomType || 'living room',
           style: style || 'modern contemporary',
+          roomDimensions,
           injectorIds: injectorIds || [],
           customGuardrails: guardrailIds || []
         })
@@ -345,6 +363,187 @@ export function registerModuleHandlers(): void {
     return results
   })
 
+  // ─────────────────────────────────────────────────────────────
+  // HQ BATCH GENERATION HANDLERS (2K Nano Banana Pro quality)
+  // ─────────────────────────────────────────────────────────────
+
+  // HQ Batch Clean Slate generation
+  ipcMain.handle('module:clean:batchGenerateHQ', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+  }) => {
+    const { jobId, assetIds, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    for (const assetId of assetIds) {
+      try {
+        const version = await generateCleanSlatePreview({
+          jobId,
+          assetId,
+          sourceVersionId: sourceVersionIdByAssetId?.[assetId],
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || []
+        })
+        
+        // Use HQ Preview generation instead of regular preview
+        generateVersionHQPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[CleanSlate HQ Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // HQ Batch Staging generation
+  ipcMain.handle('module:stage:batchGenerateHQ', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    roomType?: string
+    style?: string
+    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters' }
+    sourceVersionId?: string
+    sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+  }) => {
+    const { jobId, assetIds, roomType, style, roomDimensions, sourceVersionId, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    for (const assetId of assetIds) {
+      try {
+        const source = sourceVersionIdByAssetId?.[assetId] || sourceVersionId || `original:${assetId}`
+        
+        const version = await generateStagingPreview({
+          jobId,
+          assetId,
+          sourceVersionId: source,
+          roomType: roomType || 'living room',
+          style: style || 'modern contemporary',
+          roomDimensions,
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || []
+        })
+        
+        generateVersionHQPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[Staging HQ Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // HQ Batch Renovate generation
+  ipcMain.handle('module:renovate:batchGenerateHQ', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    changes?: any
+    sourceVersionId?: string
+    sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+  }) => {
+    const { jobId, assetIds, changes, sourceVersionId, sourceVersionIdByAssetId, injectorIds, guardrailIds } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    for (const assetId of assetIds) {
+      try {
+        const source = sourceVersionIdByAssetId?.[assetId] || sourceVersionId || `original:${assetId}`
+        
+        const version = await generateRenovatePreview({
+          jobId,
+          assetId,
+          sourceVersionId: source,
+          changes: changes || {},
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || []
+        })
+        
+        generateVersionHQPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[Renovate HQ Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // HQ Batch Twilight generation
+  ipcMain.handle('module:twilight:batchGenerateHQ', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    presetId?: string
+    promptTemplate?: string
+    lightingCondition?: 'overcast' | 'sunny'
+    sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+    customInstructions?: string
+  }) => {
+    const {
+      jobId,
+      assetIds,
+      presetId,
+      promptTemplate,
+      lightingCondition,
+      sourceVersionIdByAssetId,
+      injectorIds,
+      guardrailIds,
+      customInstructions
+    } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    const effectivePresetId = presetId || 'twilight_exterior_classic'
+    const preset = await getPreset(effectivePresetId)
+    const template = promptTemplate || preset?.promptTemplate || ''
+
+    if (!template || template.trim().length === 0) {
+      throw new Error(`Twilight HQ batchGenerate missing promptTemplate and preset not found/empty: ${effectivePresetId}`)
+    }
+
+    for (const assetId of assetIds) {
+      try {
+        const version = await generateTwilightPreview({
+          jobId,
+          assetId,
+          sourceVersionId: sourceVersionIdByAssetId?.[assetId],
+          presetId: effectivePresetId,
+          promptTemplate: template,
+          lightingCondition: lightingCondition || 'overcast',
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || [],
+          customInstructions: customInstructions || ''
+        })
+        
+        generateVersionHQPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[Twilight HQ Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
   // Constants for UI
   ipcMain.handle('constants:getRoomTypes', async () => {
     return ROOM_TYPES
@@ -389,5 +588,28 @@ export function registerModuleHandlers(): void {
       intendedModel: params.intendedModel,
       env: process.env
     })
+  })
+
+  // Cost estimation handlers
+  ipcMain.handle('cost:estimateExtended', async (_event, params: {
+    previewCount?: number
+    hqPreviewCount?: number
+    native4KCount?: number
+    finalCount?: number
+  }) => {
+    return estimateExtendedCost(params)
+  })
+
+  ipcMain.handle('cost:getCostPerImage', async () => {
+    return getCostPerImage()
+  })
+
+  // Asset working source handlers
+  ipcMain.handle('asset:setWorkingSource', async (_event, params: {
+    jobId: string
+    assetId: string
+    versionId: string | null
+  }) => {
+    return setWorkingSource(params)
   })
 }

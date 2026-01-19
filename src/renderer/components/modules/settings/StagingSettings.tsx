@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useModuleStore } from '../../../store/useModuleStore'
 import { useJobStore } from '../../../store/useJobStore'
-import { Star, Layers } from 'lucide-react'
+import { Star, Layers, Ruler } from 'lucide-react'
 
 export function StagingSettings() {
   const {
@@ -15,6 +15,7 @@ export function StagingSettings() {
     setStagingRoomType,
     setStagingStyle,
     setStagingIsMasterView,
+    setStagingRoomDimensions,
     roomTypes,
     stagingStyles,
     loadConstants
@@ -73,6 +74,69 @@ export function StagingSettings() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Room Dimensions */}
+      <div>
+        <label className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg cursor-pointer hover:bg-slate-800/50 transition-colors">
+          <input
+            type="checkbox"
+            checked={stagingSettings.roomDimensions.enabled}
+            onChange={(e) => setStagingRoomDimensions({ enabled: e.target.checked })}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0"
+          />
+          <div className="flex-1">
+            <div className="flex items-center gap-2 text-sm text-white">
+              <Ruler className="w-4 h-4 text-amber-400" />
+              Specify Room Dimensions
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              Help AI scale furniture realistically
+            </div>
+          </div>
+        </label>
+
+        {stagingSettings.roomDimensions.enabled && (
+          <div className="mt-3 p-3 bg-slate-900/30 rounded-lg space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="block text-xs text-slate-400 mb-1">Width</label>
+                <input
+                  type="text"
+                  value={stagingSettings.roomDimensions.width}
+                  onChange={(e) => setStagingRoomDimensions({ width: e.target.value })}
+                  placeholder="e.g. 10"
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div className="text-slate-500 pt-5">×</div>
+              <div className="flex-1">
+                <label className="block text-xs text-slate-400 mb-1">Length</label>
+                <input
+                  type="text"
+                  value={stagingSettings.roomDimensions.length}
+                  onChange={(e) => setStagingRoomDimensions({ length: e.target.value })}
+                  placeholder="e.g. 12"
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div className="w-20">
+                <label className="block text-xs text-slate-400 mb-1">Unit</label>
+                <select
+                  value={stagingSettings.roomDimensions.unit}
+                  onChange={(e) => setStagingRoomDimensions({ unit: e.target.value as 'feet' | 'meters' })}
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="feet">ft</option>
+                  <option value="meters">m</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">
+              Approximate dimensions help ensure furniture is realistically scaled.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Multi-Angle Mode Toggle */}

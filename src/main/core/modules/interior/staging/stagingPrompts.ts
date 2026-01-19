@@ -51,16 +51,38 @@ export const ROOM_TYPES = [
   'living room',
   'bedroom',
   'master bedroom',
+  'small bedroom',
+  "children's bedroom",
+  'guest bedroom',
   'dining room',
   'kitchen',
   'home office',
   'bathroom',
   'open-plan living/dining',
   'family room',
-  'guest bedroom',
   'nursery',
-  'media room'
+  'media room',
+  'studio apartment'
 ] as const
+
+// Room-specific furniture constraints
+export const ROOM_FURNITURE_CONSTRAINTS: Record<string, string> = {
+  'small bedroom': 'Use only a SINGLE bed (not queen or king). Include minimal furniture: one small nightstand, and optionally a small dresser or desk. Do not overcrowd the space.',
+  "children's bedroom": 'Use child-appropriate furniture: a single or bunk bed, child-sized desk, toy storage, and playful but tasteful decor. Furniture should be safe with rounded edges.',
+  'nursery': 'Include a crib, changing table, comfortable nursing chair, and soft storage. Use calming colors and child-safe furniture.',
+  'studio apartment': 'Use space-efficient furniture that serves multiple purposes. Include a sofa bed or murphy bed, compact dining area, and smart storage solutions.',
+  'home office': 'Include a desk, ergonomic office chair, and appropriate storage. Ensure good lighting for work.',
+  'master bedroom': 'Use a king or queen bed as the focal point with matching nightstands. Include a seating area if space permits.',
+  'guest bedroom': 'Use a queen bed with simple, welcoming decor. Keep furniture minimal but comfortable.',
+  'bedroom': 'Use a queen or double bed with nightstands. Include a dresser if space permits.',
+  'living room': 'Include a sofa as the main seating, with accent chairs, coffee table, and side tables. Arrange furniture to create a conversational grouping.',
+  'dining room': 'Include a dining table with chairs appropriately sized for the space. A 6-seater table for medium rooms, 4-seater for smaller spaces.',
+  'kitchen': 'If space permits, add bar stools at a counter or island. Keep staging minimal to showcase the kitchen itself.',
+  'family room': 'Use comfortable, durable furniture suitable for family use. Include ample seating and a media console if appropriate.',
+  'media room': 'Include comfortable seating oriented toward where a TV/screen would be. Consider a sectional sofa or theater-style seating.',
+  'bathroom': 'Add minimal staging - towels, bath mat, and small decorative items only. Do not add furniture.',
+  'open-plan living/dining': 'Define distinct zones for living and dining with furniture placement. Use a rug to anchor the living area and ensure visual flow between spaces.'
+}
 
 export const STAGING_STYLES = [
   'modern contemporary',

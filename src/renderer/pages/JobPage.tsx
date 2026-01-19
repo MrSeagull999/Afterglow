@@ -86,7 +86,9 @@ export function JobPage() {
     setIsGenerating,
     selectedInjectorIds,
     selectedGuardrailIds,
-    twilightSettings
+    twilightSettings,
+    stagingSettings,
+    renovateSettings
   } = useModuleStore()
   const { setView, addToast, openSettingsModal } = useAppStore()
   
@@ -187,6 +189,25 @@ export function JobPage() {
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
       }
 
+      if (activeModule === 'stage') {
+        baseParams.roomType = stagingSettings.roomType
+        baseParams.style = stagingSettings.style
+        baseParams.roomDimensions = stagingSettings.roomDimensions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'renovate') {
+        baseParams.changes = renovateSettings.changes
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'clean') {
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
       const results = await window.api.invoke(`module:${activeModule}:batchGenerate`, baseParams)
 
       const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
@@ -228,6 +249,120 @@ export function JobPage() {
     } catch (error) {
       console.error('Batch generation failed:', error)
       addToast('Failed to start generation', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleApplyHQToSelected = async () => {
+    if (!currentJob || !activeModule || selectedAssetIds.size === 0) {
+      addToast('Select images first', 'error')
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const assetIds = Array.from(selectedAssetIds)
+
+      // Determine per-asset source version mapping
+      const sourceVersionIdByAssetId: Record<string, string> = {}
+      if (assetIds.length === 1) {
+        const assetId = assetIds[0]
+        const viewed = getViewedVersionId(assetId)
+        if (viewed) {
+          sourceVersionIdByAssetId[assetId] = viewed
+        } else {
+          if (activeModule === 'stage' || activeModule === 'renovate') {
+            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+          }
+        }
+      } else {
+        for (const assetId of assetIds) {
+          await loadVersionsForAsset(currentJob.id, assetId)
+          const latest = getAssetLatestVersion(assetId)
+          if (latest?.id) {
+            sourceVersionIdByAssetId[assetId] = latest.id
+          } else if (activeModule === 'stage' || activeModule === 'renovate') {
+            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+          }
+        }
+      }
+      
+      const baseParams: any = {
+        jobId: currentJob.id,
+        assetIds,
+        sourceVersionIdByAssetId,
+        qualityTier: 'hq_preview'  // Signal HQ preview generation
+      }
+
+      if (activeModule === 'twilight') {
+        const presets = await window.electronAPI.getPresets()
+        const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
+        baseParams.presetId = twilightSettings.presetId
+        baseParams.promptTemplate = preset?.promptTemplate || ''
+        baseParams.lightingCondition = twilightSettings.lightingCondition
+        baseParams.customInstructions = twilightSettings.customInstructions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'stage') {
+        baseParams.roomType = stagingSettings.roomType
+        baseParams.style = stagingSettings.style
+        baseParams.roomDimensions = stagingSettings.roomDimensions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'renovate') {
+        baseParams.changes = renovateSettings.changes
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'clean') {
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      const results = await window.api.invoke(`module:${activeModule}:batchGenerateHQ`, baseParams)
+
+      const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
+
+      for (const assetId of assetIds) {
+        const createdId = createdVersionIdsByAssetId[assetId]
+        if (!createdId) continue
+        const sourceId = sourceVersionIdByAssetId[assetId]
+        const sourceVersionIds = sourceId ? [sourceId] : []
+        const pending = useJobStore.getState().createOptimisticPendingVersion({
+          jobId: currentJob.id,
+          assetId,
+          versionId: createdId,
+          module: activeModule,
+          sourceVersionIds
+        })
+        useJobStore.getState().upsertVersionForAsset(assetId, pending)
+        setViewedVersionId(assetId, createdId)
+      }
+
+      useJobStore.getState().startBatchRun({
+        moduleId: activeModule,
+        assetIds,
+        createdVersionIdsByAssetId,
+        failedAssetIds
+      })
+
+      applyBatchGenerationResults({
+        assetIds,
+        results,
+        setLastAppliedVersionId,
+        setViewedVersionId
+      })
+
+      addToast(`Started HQ ${activeModule} generation for ${assetIds.length} images`, 'success')
+    } catch (error) {
+      console.error('HQ Batch generation failed:', error)
+      addToast('Failed to start HQ generation', 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -320,6 +455,7 @@ export function JobPage() {
             assets={assets}
             applyTargetLabel={applyTargetLabel}
             onApply={handleApplyToSelected}
+            onApplyHQ={handleApplyHQToSelected}
           />
         }
       />

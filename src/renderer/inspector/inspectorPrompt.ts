@@ -14,7 +14,11 @@ export async function buildInspectorAssembledPrompt(params: {
   guardrails: GuardrailLike[]
   selectedInjectorIds: Set<string>
   selectedGuardrailIds: Set<string>
-  staging: { roomType: string; style: string }
+  staging: { 
+    roomType: string
+    style: string
+    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters' }
+  }
   renovate: { changes: any }
   twilight: { presetTemplate: string }
   extraInstructions: string
@@ -32,7 +36,8 @@ export async function buildInspectorAssembledPrompt(params: {
   if (params.moduleType === 'stage') {
     basePrompt = buildStagingBasePrompt({
       roomType: params.staging.roomType || 'room',
-      style: params.staging.style || 'modern contemporary'
+      style: params.staging.style || 'modern contemporary',
+      roomDimensions: params.staging.roomDimensions
     })
   }
   if (params.moduleType === 'renovate') basePrompt = buildRenovateBasePrompt(params.renovate.changes as any)

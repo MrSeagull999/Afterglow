@@ -59,6 +59,12 @@ interface ModuleState {
     masterVersionId: string | null
     furnitureSpecId: string | null
     customInstructions: string
+    roomDimensions: {
+      enabled: boolean
+      width: string
+      length: string
+      unit: 'feet' | 'meters'
+    }
   }
 
   renovateSettings: {
@@ -108,6 +114,7 @@ interface ModuleState {
   setStagingMasterVersion: (versionId: string | null) => void
   setStagingFurnitureSpec: (specId: string | null) => void
   setStagingCustomInstructions: (instructions: string) => void
+  setStagingRoomDimensions: (dimensions: { enabled?: boolean; width?: string; length?: string; unit?: 'feet' | 'meters' }) => void
 
   // Renovate
   setRenovateSourceVersion: (versionId: string | null) => void
@@ -168,7 +175,13 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
     isMasterView: true,
     masterVersionId: null,
     furnitureSpecId: null,
-    customInstructions: ''
+    customInstructions: '',
+    roomDimensions: {
+      enabled: false,
+      width: '',
+      length: '',
+      unit: 'feet'
+    }
   },
 
   renovateSettings: {
@@ -295,6 +308,14 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       stagingSettings: { ...state.stagingSettings, customInstructions: instructions }
     })),
 
+  setStagingRoomDimensions: (dimensions) =>
+    set((state) => ({
+      stagingSettings: {
+        ...state.stagingSettings,
+        roomDimensions: { ...state.stagingSettings.roomDimensions, ...dimensions }
+      }
+    })),
+
   // Renovate
   setRenovateSourceVersion: (versionId) =>
     set((state) => ({
@@ -368,7 +389,13 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         isMasterView: true,
         masterVersionId: null,
         furnitureSpecId: null,
-        customInstructions: ''
+        customInstructions: '',
+        roomDimensions: {
+          enabled: false,
+          width: '',
+          length: '',
+          unit: 'feet'
+        }
       },
       renovateSettings: {
         sourceVersionId: null,

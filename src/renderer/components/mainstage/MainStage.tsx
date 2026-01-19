@@ -163,6 +163,7 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
   }, [selectedAsset, orderedVersionsForSingle, viewedVersionId, viewedVersion])
 
   const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const [imageLoadError, setImageLoadError] = useState<string | null>(null)
   const [contactThumbs, setContactThumbs] = useState<Record<string, string | null>>({})
   const [versionProgress, setVersionProgress] = useState<Record<string, number>>({})
   const [displayedPixelWidth, setDisplayedPixelWidth] = useState<number | null>(null)
@@ -195,10 +196,31 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
     return () => w.removeEventListener('keydown', onKeyDown)
   }, [selectionCount])
 
+  // Determine the source image path for a generating version
+  const getSourceImagePath = (version: Version | null, asset: Asset): string => {
+    if (!version) return asset.originalPath
+    
+    // If version has output, use it
+    if (version.outputPath) return version.outputPath
+    
+    // If generating, try to find the source version's output
+    if (version.sourceVersionIds && version.sourceVersionIds.length > 0) {
+      const sourceVersionId = version.sourceVersionIds[0]
+      const sourceVersion = orderedVersionsForSingle.find(v => v.id === sourceVersionId)
+      if (sourceVersion?.outputPath) return sourceVersion.outputPath
+    }
+    
+    // Check if asset has a working source path
+    if (asset.workingSourcePath) return asset.workingSourcePath
+    
+    return asset.originalPath
+  }
+
   useEffect(() => {
     let cancelled = false
     setDataUrl(null)
     setDisplayedPixelWidth(null)
+    setImageLoadError(null)
 
     if (!selectedAsset) return
 
@@ -206,8 +228,8 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
       if (selectionCount === 1) {
         if (!viewedVersionId) return selectedAsset.originalPath
         const v = viewedVersion
-        if (v?.outputPath) return v.outputPath
-        return selectedAsset.originalPath
+        // Use source image path which handles generating versions properly
+        return getSourceImagePath(v, selectedAsset)
       }
       return selectedAsset.originalPath
     })()
@@ -223,10 +245,21 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
     electronAPI
       .readImageAsDataURL(inputPath)
       .then((url) => {
-        if (!cancelled) setDataUrl(url)
+        if (!cancelled) {
+          if (url) {
+            setDataUrl(url)
+            setImageLoadError(null)
+          } else {
+            setDataUrl(null)
+            setImageLoadError(`Image file not found: ${inputPath.split('/').pop()}`)
+          }
+        }
       })
-      .catch(() => {
-        if (!cancelled) setDataUrl(null)
+      .catch((err) => {
+        if (!cancelled) {
+          setDataUrl(null)
+          setImageLoadError(`Failed to load image: ${err?.message || 'Unknown error'}`)
+        }
       })
 
     return () => {
@@ -381,28 +414,35 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
     const unsubscribe = api.onVersionProgress((data) => {
       setVersionProgress((prev) => ({ ...prev, [data.versionId]: data.progress }))
 
-      // When the currently running "last applied" version completes, refresh versions and switch viewer
-      if (
-        data.progress >= 100 &&
-        currentJob &&
-        singleSelectedAssetId &&
-        lastAppliedVersionId &&
-        data.versionId === lastAppliedVersionId
-      ) {
-        setTimeout(() => {
-          loadVersionsForAsset(currentJob.id, singleSelectedAssetId)
-            .then(() => {
-              const afterRefreshOrdered = orderVersionsOldestFirst(getAssetVersions(singleSelectedAssetId))
-              const latestId = getNewestGeneratedVersionIdForMainStage(afterRefreshOrdered)
-              setViewedVersionId(singleSelectedAssetId, latestId)
-            })
-            .catch(() => undefined)
-        }, 250)
+      // When any version completes (progress >= 100), refresh and update view
+      if (data.progress >= 100 && currentJob && singleSelectedAssetId) {
+        // Check if this is the viewed version or the last applied version
+        const isViewedVersion = viewedVersionId === data.versionId
+        const isLastApplied = lastAppliedVersionId === data.versionId
+        
+        if (isViewedVersion || isLastApplied) {
+          setTimeout(() => {
+            loadVersionsForAsset(currentJob.id, singleSelectedAssetId)
+              .then(() => {
+                // If this was the viewed version, keep viewing it (now with output)
+                // Otherwise switch to the latest
+                if (isViewedVersion) {
+                  // Force re-render by setting the same ID (triggers image reload)
+                  setViewedVersionId(singleSelectedAssetId, data.versionId)
+                } else {
+                  const afterRefreshOrdered = orderVersionsOldestFirst(getAssetVersions(singleSelectedAssetId))
+                  const latestId = getNewestGeneratedVersionIdForMainStage(afterRefreshOrdered)
+                  setViewedVersionId(singleSelectedAssetId, latestId)
+                }
+              })
+              .catch(() => undefined)
+          }, 250)
+        }
       }
     })
 
     return unsubscribe
-  }, [currentJob?.id, singleSelectedAssetId, lastAppliedVersionId])
+  }, [currentJob?.id, singleSelectedAssetId, lastAppliedVersionId, viewedVersionId])
 
   const resolvedViewedGenerationStatus = resolveGenerationStatus(viewedVersion)
   const isViewedPending = resolvedViewedGenerationStatus === 'pending'
@@ -524,6 +564,13 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
                   alt="Focused asset"
                   className="max-h-[70vh] max-w-full rounded-lg border border-slate-700 shadow-xl"
                 />
+              ) : imageLoadError ? (
+                <div className="flex flex-col items-center gap-2 text-center p-4">
+                  <AlertCircle className="w-8 h-8 text-amber-500" />
+                  <div className="text-amber-400 text-sm font-medium">Image Not Available</div>
+                  <div className="text-slate-500 text-xs max-w-md">{imageLoadError}</div>
+                  <div className="text-slate-600 text-xs">Try viewing the original or a different version</div>
+                </div>
               ) : (
                 <div className="text-slate-500 text-sm">Loading preview…</div>
               )}
@@ -616,11 +663,27 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
 
             <div className="flex-1 flex items-center justify-center relative">
               {dataUrl ? (
-                <img
-                  src={dataUrl}
-                  alt="Selected asset"
-                  className="max-h-[70vh] max-w-full rounded-lg border border-slate-700 shadow-xl"
-                />
+                <div className="relative">
+                  <img
+                    src={dataUrl}
+                    alt="Selected asset"
+                    className={`max-h-[70vh] max-w-full rounded-lg border border-slate-700 shadow-xl transition-all duration-300 ${isViewedPending ? 'blur-sm' : ''}`}
+                  />
+                  {isViewedPending && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 rounded-lg">
+                      <Loader2 className="w-12 h-12 text-blue-400 animate-spin mb-3" />
+                      <div className="text-white font-medium text-lg">Generating...</div>
+                      <div className="text-slate-300 text-sm mt-1">This may take a moment</div>
+                    </div>
+                  )}
+                </div>
+              ) : imageLoadError ? (
+                <div className="flex flex-col items-center gap-2 text-center p-4">
+                  <AlertCircle className="w-8 h-8 text-amber-500" />
+                  <div className="text-amber-400 text-sm font-medium">Image Not Available</div>
+                  <div className="text-slate-500 text-xs max-w-md">{imageLoadError}</div>
+                  <div className="text-slate-600 text-xs">Try clicking "Show Original" or select a different version</div>
+                </div>
               ) : (
                 <div className="text-slate-500 text-sm">Loading preview…</div>
               )}

@@ -13,11 +13,13 @@ export type VersionStatus =
   | 'approved'
   | 'hq_generating'
   | 'hq_ready'
+  | 'native_4k_generating'
+  | 'native_4k_ready'
   | 'final_generating'
   | 'final_ready'
   | 'error'
 
-export type QualityTier = 'preview' | 'hq_preview' | 'final'
+export type QualityTier = 'preview' | 'hq_preview' | 'native_4k' | 'final'
 
 export type GenerationStatus = 'idle' | 'pending' | 'completed' | 'failed'
 
@@ -74,6 +76,11 @@ export interface Asset {
   originalName?: string        // Original filename for reference (never sent to providers)
   sanitizedName?: string       // Safe filename used for storage and API calls
   legacySanitized?: boolean    // True if sanitizedName was set from existing filename during migration
+  
+  // Working source override - allows using a generated output (e.g., 4K declutter) as the new base
+  // When set, subsequent modules will use this path instead of originalPath
+  workingSourcePath?: string
+  workingSourceVersionId?: string  // The version ID that produced the working source
 }
 
 // ─────────────────────────────────────────────────────────────

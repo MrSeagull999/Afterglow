@@ -19,6 +19,9 @@ export interface GenerationLogEntry {
     completion?: number
     total?: number
   }
+  qualityTier?: string
+  requestedImageSize?: string
+  requestedAspectRatio?: string
 }
 
 class GenerationLogger {

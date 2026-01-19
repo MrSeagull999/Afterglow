@@ -52,7 +52,11 @@ export function PromptPreview({ module }: PromptPreviewProps) {
           extraInstructions = cleanSlateSettings.customInstructions
         }
         if (module === 'stage') {
-          basePrompt = buildStagingBasePrompt({ roomType: stagingSettings.roomType, style: stagingSettings.style })
+          basePrompt = buildStagingBasePrompt({ 
+            roomType: stagingSettings.roomType, 
+            style: stagingSettings.style,
+            roomDimensions: stagingSettings.roomDimensions
+          })
           extraInstructions = stagingSettings.customInstructions
         }
         if (module === 'renovate') {

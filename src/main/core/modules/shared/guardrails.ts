@@ -59,6 +59,12 @@ export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
     label: 'Photorealistic Quality',
     promptFragment: 'The result must be photorealistic and indistinguishable from a professional real estate photograph.',
     appliesTo: ['clean', 'stage', 'renovate', 'twilight']
+  },
+  {
+    id: 'realistic_scale',
+    label: 'Realistic Furniture Scale',
+    promptFragment: 'All furniture must be realistically scaled to the room dimensions. Do not shrink or miniaturize furniture to fit the space - if furniture would not realistically fit, use fewer or smaller appropriate pieces instead. A standard queen bed is approximately 60x80 inches, a nightstand is 20-24 inches wide, a dining chair seat is 18 inches high. Furniture should appear at human scale.',
+    appliesTo: ['stage']
   }
 ]
 

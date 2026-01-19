@@ -472,3 +472,80 @@ export async function deletePreviewsExceptApproved(jobId: string, assetId: strin
 
   return deletedCount
 }
+
+export function selectNative4KModel(params: {
+  advancedCustomModel?: string
+  previewImageModel?: string
+  previewModel?: string
+}): string {
+  const custom = (params.advancedCustomModel || '').trim()
+  if (custom.length > 0) return custom
+  return params.previewImageModel || params.previewModel || 'gemini-3-pro-image-preview'
+}
+
+export function resolveNative4KSourceVersionId(params: {
+  approvedVersion: Pick<Version, 'parentVersionId'>
+  parentVersion: Pick<Version, 'id' | 'outputPath'> | null
+}): string | null {
+  if (!params.approvedVersion.parentVersionId) return null
+  if (!params.parentVersion?.outputPath) return null
+  return params.parentVersion.id
+}
+
+export function buildNative4KCreateVersionInput(params: {
+  approvedVersion: Pick<Version, 'id' | 'assetId' | 'module' | 'recipe' | 'seed' | 'parentVersionId'>
+  parentVersion: Pick<Version, 'id' | 'outputPath'> | null
+  model: string
+}): Pick<Parameters<typeof createVersion>[0], 'assetId' | 'module' | 'qualityTier' | 'recipe' | 'sourceVersionIds' | 'parentVersionId' | 'seed' | 'model'> {
+  const sourceVersionId = resolveNative4KSourceVersionId({
+    approvedVersion: params.approvedVersion,
+    parentVersion: params.parentVersion
+  })
+
+  return {
+    assetId: params.approvedVersion.assetId,
+    module: params.approvedVersion.module,
+    qualityTier: 'native_4k',
+    recipe: params.approvedVersion.recipe,
+    sourceVersionIds: sourceVersionId ? [sourceVersionId] : [],
+    parentVersionId: params.approvedVersion.id,
+    seed: params.approvedVersion.seed ?? null,
+    model: params.model
+  }
+}
+
+export async function createNative4KFromApprovedVersion(params: {
+  jobId: string
+  approvedVersionId: string
+}): Promise<Version> {
+  const approved = await getVersion(params.jobId, params.approvedVersionId)
+  if (!approved) {
+    throw new Error(`Approved version not found: ${params.approvedVersionId}`)
+  }
+
+  if (approved.status !== 'approved') {
+    throw new Error('Native 4K generation requires an approved version')
+  }
+
+  const parent = approved.parentVersionId
+    ? await getVersion(params.jobId, approved.parentVersionId)
+    : null
+
+  const settings = await getSettings()
+  const model = selectNative4KModel({
+    advancedCustomModel: settings.advancedCustomModel,
+    previewImageModel: settings.previewImageModel,
+    previewModel: settings.previewModel
+  })
+
+  const input = buildNative4KCreateVersionInput({
+    approvedVersion: approved,
+    parentVersion: parent,
+    model
+  })
+
+  return createVersion({
+    jobId: params.jobId,
+    ...input
+  })
+}

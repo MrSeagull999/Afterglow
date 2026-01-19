@@ -98,7 +98,10 @@ export async function getAsset(jobId: string, assetId: string): Promise<Asset | 
 export async function updateAsset(
   jobId: string,
   assetId: string,
-  updates: Partial<Omit<Asset, 'id' | 'jobId' | 'sceneId' | 'originalPath' | 'createdAt'>>
+  updates: Partial<Omit<Asset, 'id' | 'jobId' | 'sceneId' | 'originalPath' | 'createdAt'>> & {
+    workingSourcePath?: string
+    workingSourceVersionId?: string
+  }
 ): Promise<Asset | null> {
   const asset = await getAsset(jobId, assetId)
   if (!asset) return null
@@ -238,4 +241,50 @@ export async function unassignAssetFromScene(jobId: string, assetId: string): Pr
   await writeFile(assetPath, JSON.stringify(updatedAsset, null, 2))
 
   return updatedAsset
+}
+
+/**
+ * Set a version's output as the working source for an asset.
+ * This allows using a generated output (e.g., 4K declutter) as the new base for subsequent modules.
+ * Pass null to clear the working source and revert to the original.
+ */
+export async function setWorkingSource(params: {
+  jobId: string
+  assetId: string
+  versionId: string | null
+}): Promise<Asset | null> {
+  const { getVersion } = await import('./versionStore')
+  
+  const asset = await getAsset(params.jobId, params.assetId)
+  if (!asset) return null
+
+  if (params.versionId === null) {
+    // Clear working source - revert to original
+    return updateAsset(params.jobId, params.assetId, {
+      workingSourcePath: undefined,
+      workingSourceVersionId: undefined
+    })
+  }
+
+  const version = await getVersion(params.jobId, params.versionId)
+  if (!version || !version.outputPath) {
+    throw new Error(`Version ${params.versionId} not found or has no output`)
+  }
+
+  // Verify the output file exists
+  if (!existsSync(version.outputPath)) {
+    throw new Error(`Version output file not found: ${version.outputPath}`)
+  }
+
+  return updateAsset(params.jobId, params.assetId, {
+    workingSourcePath: version.outputPath,
+    workingSourceVersionId: params.versionId
+  })
+}
+
+/**
+ * Get the effective source path for an asset (working source if set, otherwise original)
+ */
+export function getEffectiveSourcePath(asset: Asset): string {
+  return asset.workingSourcePath || asset.originalPath
 }

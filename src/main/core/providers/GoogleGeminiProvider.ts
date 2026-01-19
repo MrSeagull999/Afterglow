@@ -17,7 +17,7 @@ export class GoogleGeminiProvider implements IImageProvider {
       return { success: false, error: 'Google API key not configured' }
     }
 
-    const { prompt, imageData, mimeType, model, imageSize = '1024x1024', seed } = request
+    const { prompt, imageData, mimeType, model, imageSize = '1024x1024', aspectRatio, seed } = request
     const includeSeed = seed !== null && seed !== undefined
 
     try {
@@ -25,8 +25,12 @@ export class GoogleGeminiProvider implements IImageProvider {
       console.log(`[GoogleGeminiProvider] Generating with model: ${model}`)
       console.log(`[GoogleGeminiProvider] Endpoint: ${endpoint}`)
       console.log(`[GoogleGeminiProvider] Provider: google`)
+      console.log(`[GoogleGeminiProvider] Image size: ${imageSize}`)
+      if (aspectRatio) {
+        console.log(`[GoogleGeminiProvider] Aspect ratio: ${aspectRatio}`)
+      }
       
-      let response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, seed ?? null, includeSeed)
+      let response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, aspectRatio, seed ?? null, includeSeed)
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -35,7 +39,7 @@ export class GoogleGeminiProvider implements IImageProvider {
         // Retry without seed if seed was rejected
         if (includeSeed && this.isSeedRejectionError(errorText)) {
           console.log('[GoogleGeminiProvider] Seed rejected, retrying without seed...')
-          response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, null, false)
+          response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, aspectRatio, null, false)
           
           if (!response.ok) {
             const retryErrorText = await response.text()
@@ -84,6 +88,7 @@ export class GoogleGeminiProvider implements IImageProvider {
     imageData: string,
     mimeType: string,
     imageSize: string,
+    aspectRatio: string | undefined,
     seed: number | null,
     includeSeed: boolean
   ): Promise<Response> {
@@ -95,6 +100,43 @@ export class GoogleGeminiProvider implements IImageProvider {
     
     if (includeSeed && seed !== null) {
       generationConfig.seed = seed
+    }
+
+    // Configure image output size via imageConfig
+    // Gemini API imageSize values: "1K", "2K", "4K" (only supported on gemini-3-pro-image-preview)
+    // Map our internal sizes to Gemini API values
+    const imageConfig: Record<string, string> = {}
+    
+    // Map internal size values to Gemini API format
+    let geminiImageSize: string | null = null
+    if (imageSize === '4K') {
+      geminiImageSize = '4K'
+    } else if (imageSize === '1536x1536' || imageSize === '2K') {
+      // HQ Preview - use 2K resolution
+      geminiImageSize = '2K'
+    } else if (imageSize === '1024x1024' || imageSize === '1K') {
+      // Standard Preview - use 1K resolution
+      geminiImageSize = '1K'
+    }
+    
+    // imageSize is only supported on gemini-3-pro-image-preview
+    const supportsImageSize = model.includes('gemini-3')
+    
+    if (supportsImageSize && geminiImageSize) {
+      imageConfig.imageSize = geminiImageSize
+      console.log(`[GoogleGeminiProvider] Using imageSize: ${geminiImageSize}`)
+    }
+    
+    if (aspectRatio) {
+      imageConfig.aspectRatio = aspectRatio
+    } else if (geminiImageSize === '4K') {
+      // 4K requires aspect ratio
+      imageConfig.aspectRatio = '16:9'
+    }
+    
+    if (Object.keys(imageConfig).length > 0) {
+      generationConfig.imageConfig = imageConfig
+      console.log(`[GoogleGeminiProvider] imageConfig:`, JSON.stringify(imageConfig))
     }
     
     const body = {

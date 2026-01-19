@@ -135,7 +135,11 @@ export function useInspectorTruth(params: {
       let basePrompt = ''
       if (params.moduleType === 'clean') basePrompt = buildCleanSlateBasePrompt()
       if (params.moduleType === 'stage') {
-        basePrompt = buildStagingBasePrompt({ roomType: stagingSettings.roomType, style: stagingSettings.style })
+        basePrompt = buildStagingBasePrompt({ 
+          roomType: stagingSettings.roomType, 
+          style: stagingSettings.style,
+          roomDimensions: stagingSettings.roomDimensions
+        })
       }
       if (params.moduleType === 'renovate') basePrompt = buildRenovateBasePrompt(renovateSettings.changes as any)
       if (params.moduleType === 'twilight') {

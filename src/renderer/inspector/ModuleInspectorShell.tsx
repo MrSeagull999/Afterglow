@@ -118,7 +118,11 @@ export function ModuleInspectorShell({ selection, moduleType }: ModuleInspectorS
 
       let basePrompt = ''
       if (moduleType === 'clean') basePrompt = buildCleanSlateBasePrompt()
-      if (moduleType === 'stage') basePrompt = buildStagingBasePrompt({ roomType: stagingSettings.roomType, style: stagingSettings.style })
+      if (moduleType === 'stage') basePrompt = buildStagingBasePrompt({ 
+        roomType: stagingSettings.roomType, 
+        style: stagingSettings.style,
+        roomDimensions: stagingSettings.roomDimensions
+      })
       if (moduleType === 'renovate') basePrompt = buildRenovateBasePrompt(renovateSettings.changes as any)
       if (moduleType === 'twilight') basePrompt = twilightPresetTemplate
 

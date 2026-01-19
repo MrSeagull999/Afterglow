@@ -23,6 +23,12 @@ export interface StagingParams {
   sourceVersionId: string
   roomType?: string
   style?: string
+  roomDimensions?: {
+    enabled: boolean
+    width: string
+    length: string
+    unit: 'feet' | 'meters'
+  }
   injectorIds?: string[]
   customGuardrails?: string[]
   customInstructions?: string
@@ -63,7 +69,8 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
 
   const basePrompt = buildStagingBasePrompt({
     roomType: params.roomType || 'room',
-    style: params.style || 'modern contemporary'
+    style: params.style || 'modern contemporary',
+    roomDimensions: params.roomDimensions
   })
 
   const assembled = await PromptAssembler.assemble({
