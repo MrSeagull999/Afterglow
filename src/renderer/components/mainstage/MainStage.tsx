@@ -3,7 +3,19 @@ import type { Asset, Version } from '../../../shared/types'
 import { orderVersionsOldestFirst } from '../../../shared/versionOrdering'
 import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus'
 import { useJobStore } from '../../store/useJobStore'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { 
+  AlertCircle, 
+  Loader2, 
+  Layers, 
+  ChevronLeft, 
+  ChevronRight, 
+  Image as ImageIcon, 
+  Clock, 
+  Check, 
+  Download, 
+  Trash2,
+  RotateCcw
+} from 'lucide-react'
 import { VersionDots, type VersionDotState } from './VersionDots'
 import { MainStageTile } from './MainStageTile'
 
@@ -528,12 +540,14 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
                 const viewedId = getViewedVersionId(asset.id)
                 const versions = getAssetVersions(asset.id)
                 const viewed = viewedId ? versions.find((v) => v.id === viewedId) || null : null
+                const isWorkingSource = !!(viewed && asset.workingSourceVersionId === viewed.id)
                 return (
                   <MainStageTile
                     key={asset.id}
                     asset={asset}
                     viewedVersion={viewed}
                     thumbDataUrl={thumb || null}
+                    isWorkingSource={isWorkingSource}
                     onClick={() => {
                       setFocusedAssetId(asset.id)
                       setBatchView('focused')
@@ -579,14 +593,15 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
         )}
 
         {selectionCount === 1 && selectedAsset && (
-          <div className="h-full flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="text-sm text-slate-300 min-w-0">
-                <div className="truncate">
-                  <span className="text-slate-500">Selected:</span>{' '}
-                  <span className="text-white font-medium">{selectedAsset.displayName || selectedAsset.name}</span>
+          <div className="h-full flex flex-col">
+            {/* Fixed Toolbar */}
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-slate-800/80 backdrop-blur-sm border-b border-slate-700/50">
+              {/* Left: Info */}
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="text-sm text-white font-medium truncate max-w-[200px]">
+                  {selectedAsset.displayName || selectedAsset.name}
                 </div>
-                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2">
                   <VersionDots
                     count={1 + orderedVersionsForSingle.length}
                     activeIndex={activeVersionIndex}
@@ -612,56 +627,99 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
                       setViewedVersionId(singleSelectedAssetId, next || null)
                     }}
                   />
-                  <span className="truncate">{viewingLabel}</span>
-                  {displayedPixelWidth ? ` — ${displayedPixelWidth}px` : ''}
+                  <span className="text-xs text-slate-400">{viewingLabel}</span>
+                  {displayedPixelWidth && <span className="text-xs text-slate-500">{displayedPixelWidth}px</span>}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button type="button" onClick={() => handlePrevNext(-1)} className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded">Prev</button>
-                <button type="button" onClick={() => handlePrevNext(1)} className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded">Next</button>
-                <button type="button" onClick={handleShowOriginal} className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded">Show Original</button>
-                <button type="button" onClick={handleShowCurrent} className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded">Show Current</button>
-                {viewedVersionId && !isViewedApproved && (
-                  <button
-                    type="button"
-                    onClick={handleApproveViewed}
-                    className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded"
-                    data-testid="mainstage-approve-button"
-                  >
-                    Approve
-                  </button>
-                )}
+              {/* Center: Navigation */}
+              <div className="flex items-center gap-1 px-2">
                 <button
                   type="button"
-                  onClick={handleExportViewed}
-                  disabled={!viewedVersionId}
-                  className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 rounded"
-                  data-testid="mainstage-export-button"
+                  onClick={() => handlePrevNext(-1)}
+                  className="p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                  title="Previous version"
                 >
-                  Export{isViewedApproved ? '' : ' (Draft)'}
+                  <ChevronLeft className="w-5 h-5 text-slate-300" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrevNext(1)}
+                  className="p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                  title="Next version"
+                >
+                  <ChevronRight className="w-5 h-5 text-slate-300" />
+                </button>
+                <div className="w-px h-6 bg-slate-600 mx-2" />
+                <button
+                  type="button"
+                  onClick={handleShowOriginal}
+                  className={`p-2 rounded-lg transition-colors ${!viewedVersionId ? 'bg-slate-600 text-white' : 'hover:bg-slate-700 text-slate-300'}`}
+                  title="Show Original"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShowCurrent}
+                  className="p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                  title="Show Current/Latest"
+                >
+                  <RotateCcw className="w-5 h-5 text-slate-300" />
                 </button>
                 <button
                   type="button"
                   onClick={handleShowLastApplied}
                   disabled={!lastAppliedVersionId}
-                  className="px-2 py-1 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 rounded"
+                  className="p-2 rounded-lg hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Show Last Applied"
                 >
-                  Show Last Applied
+                  <Clock className="w-5 h-5 text-slate-300" />
                 </button>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleApproveViewed}
+                  disabled={!viewedVersionId || isViewedApproved}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isViewedApproved 
+                      ? 'bg-emerald-600/20 text-emerald-400' 
+                      : 'hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300'
+                  }`}
+                  title={isViewedApproved ? 'Approved' : 'Approve'}
+                  data-testid="mainstage-approve-button"
+                >
+                  <Check className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportViewed}
+                  disabled={!viewedVersionId}
+                  className="p-2 rounded-lg hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title={`Export${isViewedApproved ? '' : ' (Draft)'}`}
+                  data-testid="mainstage-export-button"
+                >
+                  <Download className="w-5 h-5 text-slate-300" />
+                </button>
+                <div className="w-px h-6 bg-slate-600 mx-1" />
                 <button
                   type="button"
                   onClick={handleDeleteViewed}
                   disabled={!canDeleteViewedVersion}
-                  className="px-2 py-1 text-xs bg-slate-800 hover:bg-red-700 disabled:opacity-50 border border-slate-700 rounded"
+                  className="p-2 rounded-lg hover:bg-red-600/20 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-slate-400"
+                  title="Delete version"
                   data-testid="mainstage-delete-button"
                 >
-                  Delete
+                  <Trash2 className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 flex items-center justify-center relative">
+            {/* Image Area */}
+            <div className="flex-1 flex items-center justify-center relative p-4">
               {dataUrl ? (
                 <div className="relative">
                   <img
@@ -674,6 +732,14 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
                       <Loader2 className="w-12 h-12 text-blue-400 animate-spin mb-3" />
                       <div className="text-white font-medium text-lg">Generating...</div>
                       <div className="text-slate-300 text-sm mt-1">This may take a moment</div>
+                    </div>
+                  )}
+                  {selectedAsset?.workingSourceVersionId && viewedVersionId === selectedAsset.workingSourceVersionId && (
+                    <div className="absolute top-3 left-3" data-testid="mainstage-source-badge">
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-teal-600/90 rounded text-xs text-white font-medium shadow-lg">
+                        <Layers className="w-3.5 h-3.5" />
+                        Current Source
+                      </div>
                     </div>
                   )}
                 </div>

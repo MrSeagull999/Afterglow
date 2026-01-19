@@ -1,18 +1,20 @@
 import React from 'react'
 import type { Asset, Version } from '../../../shared/types'
 import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, Layers } from 'lucide-react'
 
 export function MainStageTile({
   asset,
   viewedVersion,
   thumbDataUrl,
-  onClick
+  onClick,
+  isWorkingSource
 }: {
   asset: Asset
   viewedVersion: Version | null
   thumbDataUrl: string | null
   onClick: () => void
+  isWorkingSource?: boolean
 }) {
   const label = asset.displayName || asset.name
   const status = resolveGenerationStatus(viewedVersion)
@@ -45,6 +47,15 @@ export function MainStageTile({
         {status === 'failed' && (
           <div className="absolute top-2 right-2" data-testid="mainstage-tile-failed">
             <AlertCircle className="w-5 h-5 text-amber-400 drop-shadow" />
+          </div>
+        )}
+
+        {isWorkingSource && (
+          <div className="absolute top-2 left-2" data-testid="mainstage-tile-source">
+            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-teal-600/90 rounded text-[10px] text-white font-medium shadow">
+              <Layers className="w-3 h-3" />
+              Source
+            </div>
           </div>
         )}
       </div>

@@ -69,7 +69,8 @@ export function InspectorPanel(props: InspectorPanelProps) {
     jumpToBatchAsset,
     jumpToNextFailedInBatchRun,
     jumpToNextPendingInBatchRun,
-    jumpToNextCompletedInBatchRun
+    jumpToNextCompletedInBatchRun,
+    loadAssetsForJob
   } = useJobStore()
 
   const { addToast } = useAppStore()
@@ -194,6 +195,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
         assetId: props.selectedAssetIds[0],
         versionId: viewedVersion.id
       })
+      await loadAssetsForJob(currentJob.id)
       addToast('Set as working source for other modules', 'success')
     } catch (error) {
       addToast('Failed to set working source', 'error')
@@ -208,6 +210,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
         assetId: props.selectedAssetIds[0],
         versionId: null
       })
+      await loadAssetsForJob(currentJob.id)
       addToast('Reverted to original source', 'success')
     } catch (error) {
       addToast('Failed to clear working source', 'error')

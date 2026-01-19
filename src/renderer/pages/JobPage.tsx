@@ -8,6 +8,7 @@ import { ThreeColumnLayout } from '../components/layout/ThreeColumnLayout'
 import { MainStage } from '../components/mainstage/MainStage'
 import { InspectorPanel } from '../inspector/InspectorPanel'
 import { LibraryHeader } from '../components/library/LibraryHeader'
+import { SourcePreviewPanel } from '../components/library/SourcePreviewPanel'
 import { ToolDock } from '../components/toolDock/ToolDock'
 import type { ModuleType } from '../../shared/types'
 import {
@@ -432,6 +433,7 @@ export function JobPage() {
         left={
           <>
             <LibraryHeader />
+            <SourcePreviewPanel selectedAssetIds={Array.from(selectedAssetIds)} />
             <div className="flex-1 overflow-hidden">
               <ModuleGrid activeModule={activeModule} libraryMode />
             </div>
