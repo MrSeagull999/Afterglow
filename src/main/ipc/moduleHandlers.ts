@@ -225,7 +225,7 @@ export function registerModuleHandlers(): void {
     assetIds: string[]
     roomType?: string
     style?: string
-    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters' }
+    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters'; backWall?: string; leftWall?: string; rightWall?: string; ceilingHeight?: string }
     sourceVersionId?: string
     sourceVersionIdByAssetId?: Record<string, string>
     injectorIds?: string[]
@@ -408,7 +408,7 @@ export function registerModuleHandlers(): void {
     assetIds: string[]
     roomType?: string
     style?: string
-    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters' }
+    roomDimensions?: { enabled: boolean; width: string; length: string; unit: 'feet' | 'meters'; backWall?: string; leftWall?: string; rightWall?: string; ceilingHeight?: string }
     sourceVersionId?: string
     sourceVersionIdByAssetId?: Record<string, string>
     injectorIds?: string[]

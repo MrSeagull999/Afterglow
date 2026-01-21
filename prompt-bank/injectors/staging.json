@@ -4,85 +4,92 @@
       "id": "add_area_rug",
       "module": "stage",
       "label": "Add Area Rug",
-      "promptFragment": "Include an appropriately sized area rug that anchors the furniture arrangement and complements the design style.",
+      "promptFragment": "Add an appropriately sized area rug that anchors the furniture arrangement and complements the design style.",
       "category": "soft_furnishings"
     },
     {
       "id": "add_curtains",
       "module": "stage",
       "label": "Add Curtains",
-      "promptFragment": "Add elegant floor-length curtains to the windows that complement the room's color palette and style.",
+      "promptFragment": "Add curtains or drapes to bare windows in a style matching the overall design aesthetic. Use floor-length curtains that complement the room's color palette.",
       "category": "window_treatments"
     },
     {
       "id": "add_plants",
       "module": "stage",
       "label": "Add Indoor Plants",
-      "promptFragment": "Include tasteful indoor plants - a mix of sizes from small potted plants to larger floor plants where appropriate.",
+      "promptFragment": "Include 1-3 indoor plants in appropriate locations (corners, beside furniture, on surfaces). Mix sizes from small potted plants to larger floor plants where space permits.",
       "category": "decor"
     },
     {
       "id": "add_artwork",
       "module": "stage",
       "label": "Add Wall Art",
-      "promptFragment": "Add tasteful wall art that complements the room's style - properly scaled and positioned artwork or photography.",
+      "promptFragment": "Add wall art that complements the room's style. Include properly scaled and positioned artwork, framed prints, or photography on appropriate walls.",
       "category": "decor"
     },
     {
       "id": "minimal_staging",
       "module": "stage",
       "label": "Minimal Staging",
-      "promptFragment": "Use minimal furniture - only essential pieces. Keep the space feeling open and uncluttered.",
+      "promptFragment": "STYLE MODIFIER: Use minimal furniture - only essential pieces. Keep the space feeling open and uncluttered with maximum negative space.",
       "category": "style_modifier"
     },
     {
       "id": "luxury_staging",
       "module": "stage",
       "label": "Luxury Staging",
-      "promptFragment": "Use high-end, luxury furniture and finishes. Include premium materials like marble, brass, and rich textiles.",
+      "promptFragment": "STYLE MODIFIER: Use high-end, luxury furniture and finishes. Include premium materials like marble, brass, velvet, and rich textiles. Select designer-quality pieces.",
       "category": "style_modifier"
     },
     {
       "id": "family_friendly",
       "module": "stage",
       "label": "Family-Friendly",
-      "promptFragment": "Stage with family-friendly furniture - durable fabrics, rounded edges, and a warm, inviting feel suitable for families with children.",
+      "promptFragment": "STYLE MODIFIER: Stage with family-friendly furniture - durable fabrics, rounded edges, and a warm, inviting feel suitable for families with children. Avoid delicate or fragile-looking pieces.",
       "category": "style_modifier"
     },
     {
       "id": "add_lighting",
       "module": "stage",
       "label": "Add Accent Lighting",
-      "promptFragment": "Include table lamps and floor lamps to create warm, layered lighting throughout the space.",
+      "promptFragment": "Add portable lighting fixtures: table lamps on side tables/consoles and floor lamps in corners or beside seating. These are PORTABLE lamps only - do NOT add or modify ceiling fixtures, wall sconces, or permanent lighting.",
       "category": "lighting"
     },
     {
       "id": "add_throws_cushions",
       "module": "stage",
       "label": "Add Throws & Cushions",
-      "promptFragment": "Add cozy throws and decorative cushions to sofas and beds for a lived-in, inviting feel.",
+      "promptFragment": "Add decorative throws draped over sofas/chairs and decorative cushions arranged on seating and beds for a lived-in, inviting feel.",
       "category": "soft_furnishings"
     },
     {
       "id": "neutral_palette",
       "module": "stage",
       "label": "Neutral Color Palette",
-      "promptFragment": "Use a neutral color palette - whites, creams, grays, and natural wood tones. Avoid bold or bright colors.",
+      "promptFragment": "COLOR MODIFIER: Use a neutral color palette throughout - whites, creams, beiges, grays, and natural wood tones. Avoid bold or bright accent colors.",
       "category": "color"
     },
     {
       "id": "warm_palette",
       "module": "stage",
       "label": "Warm Color Palette",
-      "promptFragment": "Use warm colors - terracotta, rust, warm browns, and golden tones throughout the staging.",
+      "promptFragment": "COLOR MODIFIER: Use warm colors throughout the staging - terracotta, rust, warm browns, golden tones, and warm neutrals.",
       "category": "color"
     },
     {
       "id": "cool_palette",
       "module": "stage",
       "label": "Cool Color Palette",
-      "promptFragment": "Use cool colors - blues, greens, and cool grays throughout the staging.",
+      "promptFragment": "COLOR MODIFIER: Use cool colors throughout the staging - blues, greens, cool grays, and silver tones.",
       "category": "color"
+    },
+    {
+      "id": "add_mirrors",
+      "module": "stage",
+      "label": "Add Mirrors",
+      "promptFragment": "Include a tasteful mirror positioned on a side wall or above furniture (dresser, console table). The mirror must be positioned to reflect room depth or side walls rather than face the camera directly. Ensure reflections show actual room geometry only.",
+      "category": "decor"
     }
   ],
   "version": "1.0.0"

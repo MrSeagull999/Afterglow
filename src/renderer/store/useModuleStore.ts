@@ -64,6 +64,11 @@ interface ModuleState {
       width: string
       length: string
       unit: 'feet' | 'meters'
+      // Wall-relative dimensions (new)
+      backWall: string
+      leftWall: string
+      rightWall: string
+      ceilingHeight: string
     }
   }
 
@@ -114,7 +119,7 @@ interface ModuleState {
   setStagingMasterVersion: (versionId: string | null) => void
   setStagingFurnitureSpec: (specId: string | null) => void
   setStagingCustomInstructions: (instructions: string) => void
-  setStagingRoomDimensions: (dimensions: { enabled?: boolean; width?: string; length?: string; unit?: 'feet' | 'meters' }) => void
+  setStagingRoomDimensions: (dimensions: { enabled?: boolean; width?: string; length?: string; unit?: 'feet' | 'meters'; backWall?: string; leftWall?: string; rightWall?: string; ceilingHeight?: string }) => void
 
   // Renovate
   setRenovateSourceVersion: (versionId: string | null) => void
@@ -180,7 +185,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       enabled: false,
       width: '',
       length: '',
-      unit: 'feet'
+      unit: 'feet',
+      backWall: '',
+      leftWall: '',
+      rightWall: '',
+      ceilingHeight: ''
     }
   },
 
@@ -394,7 +403,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
           enabled: false,
           width: '',
           length: '',
-          unit: 'feet'
+          unit: 'feet',
+          backWall: '',
+          leftWall: '',
+          rightWall: '',
+          ceilingHeight: ''
         }
       },
       renovateSettings: {

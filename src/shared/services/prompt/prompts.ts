@@ -49,38 +49,132 @@ export interface StagingPromptParams {
     width: string
     length: string
     unit: 'feet' | 'meters'
+    backWall?: string
+    leftWall?: string
+    rightWall?: string
+    ceilingHeight?: string
   }
+}
+
+// Standard furniture dimensions for scale reference
+const FURNITURE_SCALE_REFERENCE = `
+FURNITURE SCALE REFERENCE (use these as anchors for realistic sizing):
+- Standard door: 2.1m tall × 0.9m wide
+- Single bed: 0.9m wide × 1.9m long
+- Double bed: 1.4m wide × 1.9m long  
+- Queen bed: 1.5m wide × 2.0m long
+- King bed: 1.8m wide × 2.0m long
+- Bedside table: 0.5m wide × 0.5m deep × 0.6m tall
+- Standard desk: 1.2m wide × 0.6m deep × 0.75m tall
+- Office chair seat height: 0.45m
+- Dining chair seat height: 0.45m
+- 2-seater sofa: 1.5m wide
+- 3-seater sofa: 2.0-2.4m wide
+- Coffee table: 1.2m × 0.6m × 0.45m tall
+- Standard ceiling height: 2.4-2.7m`
+
+export interface EditModeParams {
+  userChanges: string
+  preserveExisting?: boolean
+}
+
+export function buildEditModePrefix(params: EditModeParams): string {
+  const preserveNote = params.preserveExisting !== false 
+    ? `
+PRESERVE everything else exactly as shown:
+- Keep all existing furniture in the same positions
+- Maintain all existing decor items
+- Do not add any new elements unless specified
+- Do not remove any elements unless specified` 
+    : ''
+
+  return `⚠️ EDIT MODE ACTIVE ⚠️
+This image already contains virtual staging. Make ONLY the following changes:
+
+${params.userChanges}
+${preserveNote}
+
+All other requirements and preservation rules still apply.`
 }
 
 export function buildStagingBasePrompt(params: StagingPromptParams): string {
   const { roomType, style, roomDimensions } = params
   
-  // Build room dimensions instruction if provided
+  // Build wall-specific dimensions instruction if provided
   let dimensionsInstruction = ''
-  if (roomDimensions?.enabled && roomDimensions.width && roomDimensions.length) {
-    const unit = roomDimensions.unit === 'meters' ? 'meters' : 'feet'
-    dimensionsInstruction = `\n\nROOM DIMENSIONS: This room is approximately ${roomDimensions.width} × ${roomDimensions.length} ${unit}. Scale all furniture realistically to these dimensions. Do not shrink furniture to fit - if standard furniture would not fit, use fewer or smaller appropriate pieces instead.`
+  if (roomDimensions?.enabled) {
+    const unit = roomDimensions.unit === 'meters' ? 'm' : 'ft'
+    const wallDimensions: string[] = []
+    
+    if (roomDimensions.backWall) {
+      wallDimensions.push(`The BACK WALL (wall facing the camera) is approximately ${roomDimensions.backWall}${unit} wide`)
+    }
+    if (roomDimensions.leftWall) {
+      wallDimensions.push(`The LEFT WALL extends approximately ${roomDimensions.leftWall}${unit} into the room`)
+    }
+    if (roomDimensions.rightWall) {
+      wallDimensions.push(`The RIGHT WALL extends approximately ${roomDimensions.rightWall}${unit} into the room`)
+    }
+    if (roomDimensions.ceilingHeight) {
+      wallDimensions.push(`Ceiling height is approximately ${roomDimensions.ceilingHeight}${unit}`)
+    }
+    
+    // Fallback to legacy width×length if no wall-specific dimensions
+    if (wallDimensions.length === 0 && roomDimensions.width && roomDimensions.length) {
+      dimensionsInstruction = `\n\nROOM DIMENSIONS: This room is approximately ${roomDimensions.width} × ${roomDimensions.length} ${roomDimensions.unit === 'meters' ? 'meters' : 'feet'}.`
+    } else if (wallDimensions.length > 0) {
+      dimensionsInstruction = `\n\nROOM DIMENSIONS:\n${wallDimensions.join('.\n')}.
+
+CRITICAL SCALE INSTRUCTION: Use these wall dimensions to calculate correct furniture sizes. Do NOT shrink furniture to "fit nicely" - furniture must be rendered at REAL-WORLD scale. If a bed would realistically take up most of a 2.7m wall, then it should take up most of that wall in the image. The goal is photorealism, not aesthetic balance.
+${FURNITURE_SCALE_REFERENCE}`
+    }
   }
   
   // Get room-specific furniture constraints
   const furnitureConstraint = ROOM_FURNITURE_CONSTRAINTS[roomType] || ''
   const furnitureInstruction = furnitureConstraint ? `\n\nFURNITURE REQUIREMENTS FOR ${roomType.toUpperCase()}: ${furnitureConstraint}` : ''
 
-  return `Virtually stage this empty ${roomType} with realistic, high-quality furniture and decor in a ${style} style.${dimensionsInstruction}${furnitureInstruction}
+  return `Virtually stage this empty ${roomType} with realistic, high-quality furniture in a ${style} style.${dimensionsInstruction}${furnitureInstruction}
 
-Requirements:
+CORE REQUIREMENTS:
 1) Add appropriate furniture for a ${roomType}: select pieces that are proportional to the space and professionally arranged.
-2) Use a cohesive ${style} design aesthetic throughout - furniture, textiles, and accessories should complement each other.
-3) Include realistic soft furnishings: rugs, cushions, throws, and curtains where appropriate.
-4) Add tasteful decor: artwork, plants, lamps, and decorative objects that enhance the space without cluttering.
-5) Ensure all furniture is properly grounded with realistic shadows and reflections.
-6) PRESERVE all architectural elements exactly: walls, floors, ceilings, windows, doors, and built-in features.
-7) PRESERVE all surface materials - do not change paint colors, flooring, or any existing finishes.
-8) Maintain consistent lighting that matches the original photograph.
-9) The result must be photorealistic and suitable for professional real estate marketing.
-10) Maintain the exact same camera angle and perspective.
-11) Furniture placement should feel natural and allow for realistic traffic flow through the space.
-12) All furniture must be realistically scaled - do not miniaturize or shrink furniture to fit the space.`
+2) Use a cohesive ${style} design aesthetic throughout - furniture and textiles should complement each other.
+3) Ensure all furniture is properly grounded with realistic shadows and reflections.
+4) Furniture placement should feel natural and allow for realistic traffic flow through the space.
+5) All furniture must be realistically scaled - do not miniaturize or shrink furniture to fit the space.
+
+FURNITURE POSITIONING GUIDANCE:
+- CRITICAL: When specific wall placement is requested in custom instructions (e.g., "bed against right wall"), you MUST follow those instructions exactly. This is a mandatory requirement.
+- Wall identification system: BACK WALL = wall facing the camera (visible in background), LEFT WALL = wall on left side of image, RIGHT WALL = wall on right side of image.
+- For bedrooms: If a wall is specified for the bed (e.g., "bed against RIGHT WALL"), the bed headboard MUST be placed flush against that wall. Do NOT place the bed in the center of the room. Do NOT float the bed away from the wall.
+- Default furniture placement: Furniture should be positioned against walls or in logical arrangements. Do NOT arbitrarily center furniture in the middle of the room unless explicitly requested to do so.
+- If custom instructions specify "bed against RIGHT WALL", this means: position the bed so the headboard is touching the right wall, with the bed extending into the room perpendicular to that wall.
+
+STRICT PRESERVATION RULES:
+- PRESERVE all architectural elements exactly: walls, floors, ceilings, windows, doors, and built-in features.
+- PRESERVE all surface materials - do not change paint colors, flooring, or any existing finishes.
+- DO NOT add, remove, or modify any lighting fixtures (ceiling lights, wall sconces, pendant lights, chandeliers, recessed lighting).
+- DO NOT add or modify window treatments (curtains, drapes, blinds, shades) unless explicitly instructed.
+- DO NOT add decorative elements (artwork, plants, decorative objects, accessories) unless explicitly instructed.
+- Maintain consistent lighting that matches the original photograph.
+- CRITICAL: Maintain the EXACT same camera angle, perspective, and viewpoint as the input image. Do NOT shift, rotate, zoom, or change the camera position in any way. The output must show the same view of the room as the input.
+
+MIRROR PLACEMENT RULES:
+- Mirrors should NEVER be positioned to reflect directly back toward the camera.
+- Place mirrors on walls perpendicular to the camera view (left or right walls).
+- Mirrors should reflect side walls, windows, or room depth - NOT the camera perspective.
+- Acceptable mirror placements: above dressers/console tables (angled slightly downward), on side walls (reflecting the opposite wall), or leaning mirrors in corners (angled away from camera).
+- If a mirror would face the camera directly, reposition it to a different wall, angle it to reflect the side of the room, or replace with alternative wall art.
+- Mirror reflections must be consistent with actual room geometry - do NOT hallucinate or invent doors, windows, or architectural elements in reflections.
+
+REFLECTIVE SURFACE GUIDELINES:
+- Avoid placing highly reflective objects (mirrors, glossy artwork, metallic sculptures) directly facing the camera.
+- Glass-fronted cabinets and picture frames should be angled to minimize direct reflection toward camera.
+- TV screens should be positioned to show minimal glare/reflection from the camera angle.
+
+OUTPUT QUALITY:
+- The result must be photorealistic and suitable for professional real estate marketing.
+- ONLY add elements that are explicitly specified in additional instructions below.`
 }
 
 export function buildTwilightPreviewBasePrompt(
@@ -89,31 +183,28 @@ export function buildTwilightPreviewBasePrompt(
 ): string {
   const lightingModifier =
     lightingCondition === 'sunny'
-      ? `IMPORTANT LIGHTING CORRECTION STEP:
-Before applying twilight or evening lighting, remove all visual evidence of direct sunlight.
-- Neutralize harsh midday shadows caused by overhead sun.
-- Reduce strong highlight contrast on roofs, paving, foliage, and walls.
-- Soften specular highlights and sunlit hotspots.
-- Ensure lighting appears evenly diffused, as if the sun has already dropped below the horizon.
+      ? `This photograph was taken in bright midday sunlight. Transform the entire lighting condition from midday to dusk, as if the sun has already set below the horizon 20-30 minutes ago during blue hour.
 
-All shadows must be recalculated to match dusk conditions:
-- No hard or directional midday shadows.
-- Shadows should be soft, low-contrast, and consistent with ambient twilight.`
+Replace the harsh overhead sunlight with the soft, diffused ambient light of early evening. The scene should have the gentle, low-contrast illumination characteristic of dusk - no directional sun rays, no bright highlights, and no hard shadows from overhead light sources.
+
+Specifically, transform the foliage and landscaping from their bright, sunlit appearance to the darker, more muted tones they would naturally have in evening light. Green leaves should appear significantly less saturated and less luminous than in midday sun. Tree shadows on the ground should be eliminated or softened to barely-visible subtle gradients that match the even ambient light of dusk.
+
+The sky should display a natural blue hour gradient - transitioning from deep blue at the zenith down to soft warm peach and coral tones near the horizon line. This is not bright daylight blue sky; it's the cooler, richer blue of early evening after sunset.
+
+Overall, reduce the scene's luminosity and contrast to match authentic dusk conditions. Every surface - roofs, walls, paving, grass, foliage - should appear as it would naturally look in the soft, even light of early evening, not in bright midday sun.`
       : ''
 
-  const guard = `This is a truth-preserving twilight conversion of the provided photograph. Do not reinterpret the scene.
+  const guard = `This is a time-of-day lighting conversion of the provided photograph. Preserve the exact scene composition, architecture, and all physical elements while changing only the lighting conditions to twilight.
 
-Window rule: Treat windows as light-emitting planes, not viewports. Windows may glow softly but must remain indistinct and non-descriptive.
-- Do NOT show interior objects, furniture, silhouettes, people, room layouts, or any visible room contents through windows.
-- Interior light should be diffuse and uniform; avoid directional beams, visible edges, shapes, or interior structure.
+For exterior photographs: Windows should glow with warm interior light, appearing as softly illuminated surfaces. The window glass shows a gentle amber or warm white glow from inside, but you cannot see through the glass to view interior details - just the warm light emanating from within.
 
-Exterior lighting rule: Do NOT invent exterior/garden/landscape lighting (path lights, uplights, wall washers, glowing plants).
-- Only show exterior lighting if a physical lighting fixture is clearly visible in the original image.
-- If the source of light is unclear, reduce intensity rather than inventing a source.
+For interior photographs: Through the windows, you should see the natural twilight sky outside exactly as it appears in the original photograph's exterior view. If the original shows neighboring buildings, fences, trees, or other structures through the windows, these must remain completely unchanged - only add the blue hour sky gradient above and behind these existing exterior elements. The view through the windows should look like the actual exterior at dusk, not an invented or altered scene.
 
-Warmth guidance: Maintain a warm, inviting interior glow, biased toward neutral warm-white (not saturated orange). Keep color natural and balanced.
+Regarding lighting fixtures: Only work with light sources that already exist in the photograph. For exterior shots, enhance only the landscape lighting fixtures that are physically visible in the original image. For interior shots, enhance only the ceiling lights, lamps, and fixtures that are already present in the room. If you're uncertain whether a light source exists, it's better to show subtle ambient lighting rather than adding new fixtures.
 
-Ambiguity rule: If unsure, do nothing. Do not add details to unclear/occluded areas; darkness is acceptable. Higher resolution must not increase semantic detail.`
+The color palette should feel warm and inviting with neutral warm-white tones around 2700-3200K for interior lighting. Avoid heavily saturated orange or artificial-looking color casts. The overall look should be natural and balanced, as if this photograph was actually taken during twilight rather than artificially processed.
+
+When details in the original photograph are unclear or partially obscured, leave them as they are - do not invent or add new details in these areas.`
 
   const presetAlreadyContainsGuard =
     /truth-preserving twilight conversion/i.test(presetPromptTemplate) ||

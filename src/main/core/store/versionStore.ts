@@ -29,14 +29,12 @@ export async function createFinalFromApprovedVersion(params: {
   jobId: string
   approvedVersionId: string
 }): Promise<Version> {
-  const approved = await getVersion(params.jobId, params.approvedVersionId)
-  if (!approved) {
+  const sourceVersion = await getVersion(params.jobId, params.approvedVersionId)
+  if (!sourceVersion) {
     throw new Error(`Source version not found: ${params.approvedVersionId}`)
   }
 
-  if (approved.status !== 'approved' && approved.status !== 'hq_ready') {
-    throw new Error('Final generation requires an approved or HQ-ready version')
-  }
+  // Allow 4K generation from any preview or HQ version (no approval required)
 
   const settings = await getSettings()
   const model = selectFinalModel({
@@ -46,13 +44,13 @@ export async function createFinalFromApprovedVersion(params: {
 
   return createVersion({
     jobId: params.jobId,
-    assetId: approved.assetId,
-    module: approved.module,
+    assetId: sourceVersion.assetId,
+    module: sourceVersion.module,
     qualityTier: 'final',
-    recipe: approved.recipe,
-    sourceVersionIds: approved.sourceVersionIds,
-    parentVersionId: approved.id,
-    seed: approved.seed ?? null,
+    recipe: sourceVersion.recipe,
+    sourceVersionIds: sourceVersion.sourceVersionIds,
+    parentVersionId: sourceVersion.id,
+    seed: sourceVersion.seed ?? null,
     model
   })
 }
@@ -211,8 +209,14 @@ export async function getVersion(jobId: string, versionId: string): Promise<Vers
   if (!existsSync(versionPath)) {
     return null
   }
-  const data = await readFile(versionPath, 'utf-8')
-  return JSON.parse(data)
+  try {
+    const data = await readFile(versionPath, 'utf-8')
+    return JSON.parse(data)
+  } catch (error) {
+    console.error(`[VersionStore] Failed to parse version file ${versionPath}:`, error)
+    console.error(`[VersionStore] Corrupted version file will be skipped: ${versionId}`)
+    return null
+  }
 }
 
 export async function updateVersion(
@@ -518,17 +522,15 @@ export async function createNative4KFromApprovedVersion(params: {
   jobId: string
   approvedVersionId: string
 }): Promise<Version> {
-  const approved = await getVersion(params.jobId, params.approvedVersionId)
-  if (!approved) {
-    throw new Error(`Approved version not found: ${params.approvedVersionId}`)
+  const sourceVersion = await getVersion(params.jobId, params.approvedVersionId)
+  if (!sourceVersion) {
+    throw new Error(`Source version not found: ${params.approvedVersionId}`)
   }
 
-  if (approved.status !== 'approved') {
-    throw new Error('Native 4K generation requires an approved version')
-  }
+  // Allow 4K generation from any preview or HQ version (no approval required)
 
-  const parent = approved.parentVersionId
-    ? await getVersion(params.jobId, approved.parentVersionId)
+  const parent = sourceVersion.parentVersionId
+    ? await getVersion(params.jobId, sourceVersion.parentVersionId)
     : null
 
   const settings = await getSettings()
@@ -539,7 +541,7 @@ export async function createNative4KFromApprovedVersion(params: {
   })
 
   const input = buildNative4KCreateVersionInput({
-    approvedVersion: approved,
+    approvedVersion: sourceVersion,
     parentVersion: parent,
     model
   })

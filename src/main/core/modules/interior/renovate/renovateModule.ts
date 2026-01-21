@@ -110,8 +110,8 @@ export async function generateRenovateFinal(
   versionId: string
 ): Promise<Version | null> {
   const version = await getVersion(jobId, versionId)
-  if (!version || version.status !== 'approved') {
-    throw new Error('Version must be approved before generating final')
+  if (!version) {
+    throw new Error('Version not found')
   }
 
   return startFinalGeneration(jobId, versionId)

@@ -91,8 +91,14 @@ export async function getAsset(jobId: string, assetId: string): Promise<Asset | 
   if (!existsSync(assetPath)) {
     return null
   }
-  const data = await readFile(assetPath, 'utf-8')
-  return JSON.parse(data)
+  try {
+    const data = await readFile(assetPath, 'utf-8')
+    return JSON.parse(data)
+  } catch (error) {
+    console.error(`[AssetStore] Failed to parse asset file ${assetPath}:`, error)
+    console.error(`[AssetStore] Corrupted asset file will be skipped: ${assetId}`)
+    return null
+  }
 }
 
 export async function updateAsset(

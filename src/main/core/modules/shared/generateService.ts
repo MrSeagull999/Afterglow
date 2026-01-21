@@ -479,9 +479,9 @@ export async function generateVersionFinal(
       throw new Error(`Version not found: ${versionId}`)
     }
 
-    // Allow final generation from approved/hq_ready versions, or from a newly created final version record.
-    if (version.qualityTier !== 'final' && version.status !== 'approved' && version.status !== 'hq_ready') {
-      throw new Error('Version must be approved or HQ ready before generating final')
+    // Allow final generation from any preview or HQ version (no approval required)
+    if (version.qualityTier !== 'final' && version.qualityTier !== 'preview' && version.qualityTier !== 'hq_preview') {
+      throw new Error('Version must be preview, HQ preview, or final quality tier')
     }
 
     await setVersionGenerationStatus(jobId, versionId, 'pending')

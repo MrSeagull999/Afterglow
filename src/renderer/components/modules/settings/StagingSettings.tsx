@@ -98,28 +98,11 @@ export function StagingSettings() {
 
         {stagingSettings.roomDimensions.enabled && (
           <div className="mt-3 p-3 bg-slate-900/30 rounded-lg space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <label className="block text-xs text-slate-400 mb-1">Width</label>
-                <input
-                  type="text"
-                  value={stagingSettings.roomDimensions.width}
-                  onChange={(e) => setStagingRoomDimensions({ width: e.target.value })}
-                  placeholder="e.g. 10"
-                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-              <div className="text-slate-500 pt-5">×</div>
-              <div className="flex-1">
-                <label className="block text-xs text-slate-400 mb-1">Length</label>
-                <input
-                  type="text"
-                  value={stagingSettings.roomDimensions.length}
-                  onChange={(e) => setStagingRoomDimensions({ length: e.target.value })}
-                  placeholder="e.g. 12"
-                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
+            <p className="text-xs text-slate-400 mb-2">
+              Enter the TOTAL wall length (not just the visible portion). Leave blank if you don't know the dimension.
+            </p>
+            
+            <div className="flex items-center gap-2 mb-2">
               <div className="w-20">
                 <label className="block text-xs text-slate-400 mb-1">Unit</label>
                 <select
@@ -127,13 +110,57 @@ export function StagingSettings() {
                   onChange={(e) => setStagingRoomDimensions({ unit: e.target.value as 'feet' | 'meters' })}
                   className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
                 >
-                  <option value="feet">ft</option>
                   <option value="meters">m</option>
+                  <option value="feet">ft</option>
                 </select>
               </div>
             </div>
-            <p className="text-xs text-slate-500">
-              Approximate dimensions help ensure furniture is realistically scaled.
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Back wall width</label>
+                <input
+                  type="text"
+                  value={stagingSettings.roomDimensions.backWall}
+                  onChange={(e) => setStagingRoomDimensions({ backWall: e.target.value })}
+                  placeholder="e.g. 4"
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Ceiling height</label>
+                <input
+                  type="text"
+                  value={stagingSettings.roomDimensions.ceilingHeight}
+                  onChange={(e) => setStagingRoomDimensions({ ceilingHeight: e.target.value })}
+                  placeholder="e.g. 2.7"
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Left wall depth</label>
+                <input
+                  type="text"
+                  value={stagingSettings.roomDimensions.leftWall}
+                  onChange={(e) => setStagingRoomDimensions({ leftWall: e.target.value })}
+                  placeholder="e.g. 3.5"
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Right wall depth</label>
+                <input
+                  type="text"
+                  value={stagingSettings.roomDimensions.rightWall}
+                  onChange={(e) => setStagingRoomDimensions({ rightWall: e.target.value })}
+                  placeholder="e.g. 3.5"
+                  className="w-full px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 mt-2">
+              Wall-specific dimensions help the AI understand scale. A standard door is ~2.1m tall, a single bed is ~0.9m wide, a queen bed is ~1.5m wide.
             </p>
           </div>
         )}
