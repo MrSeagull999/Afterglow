@@ -5,7 +5,7 @@
 // ENUMS & LITERALS
 // ─────────────────────────────────────────────────────────────
 
-export type ModuleType = 'twilight' | 'clean' | 'stage' | 'renovate'
+export type ModuleType = 'twilight' | 'clean' | 'stage' | 'renovate' | 'relight'
 
 export type VersionStatus =
   | 'generating'
@@ -163,6 +163,25 @@ export interface FurnitureSpec {
   masterVersionId: string
   description: string
   createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// REFERENCE IMAGES (persistent across jobs)
+// ─────────────────────────────────────────────────────────────
+
+export interface ReferenceImage {
+  id: string
+  module: ModuleType
+  name: string
+  description?: string
+  imagePath: string
+  thumbnailPath?: string
+  createdAt: string
+}
+
+export interface ReferenceImageMetadata {
+  module: ModuleType
+  references: ReferenceImage[]
 }
 
 // ─────────────────────────────────────────────────────────────

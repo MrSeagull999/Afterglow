@@ -89,7 +89,8 @@ export function JobPage() {
     selectedGuardrailIds,
     twilightSettings,
     stagingSettings,
-    renovateSettings
+    renovateSettings,
+    relightSettings
   } = useModuleStore()
   const { setView, addToast, openSettingsModal } = useAppStore()
   
@@ -188,6 +189,28 @@ export function JobPage() {
         baseParams.customInstructions = twilightSettings.customInstructions
         baseParams.injectorIds = Array.from(selectedInjectorIds)
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (twilightSettings.referenceImageId) {
+          const refImage = await window.electronAPI.getReferenceImage('twilight', twilightSettings.referenceImageId)
+          if (refImage?.imagePath) {
+            baseParams.referenceImagePath = refImage.imagePath
+          }
+        }
+      }
+
+      if (activeModule === 'relight') {
+        const presets = await window.electronAPI.getRelightPresets()
+        const preset = presets.find((p: any) => p.id === relightSettings.presetId)
+        baseParams.presetId = relightSettings.presetId
+        baseParams.promptTemplate = preset?.promptTemplate || ''
+        baseParams.customInstructions = relightSettings.customInstructions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (relightSettings.referenceImageId) {
+          const refImage = await window.electronAPI.getReferenceImage('relight', relightSettings.referenceImageId)
+          if (refImage?.imagePath) {
+            baseParams.referenceImagePath = refImage.imagePath
+          }
+        }
       }
 
       if (activeModule === 'stage') {
@@ -305,6 +328,28 @@ export function JobPage() {
         baseParams.customInstructions = twilightSettings.customInstructions
         baseParams.injectorIds = Array.from(selectedInjectorIds)
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (twilightSettings.referenceImageId) {
+          const refImage = await window.electronAPI.getReferenceImage('twilight', twilightSettings.referenceImageId)
+          if (refImage?.imagePath) {
+            baseParams.referenceImagePath = refImage.imagePath
+          }
+        }
+      }
+
+      if (activeModule === 'relight') {
+        const presets = await window.electronAPI.getRelightPresets()
+        const preset = presets.find((p: any) => p.id === relightSettings.presetId)
+        baseParams.presetId = relightSettings.presetId
+        baseParams.promptTemplate = preset?.promptTemplate || ''
+        baseParams.customInstructions = relightSettings.customInstructions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (relightSettings.referenceImageId) {
+          const refImage = await window.electronAPI.getReferenceImage('relight', relightSettings.referenceImageId)
+          if (refImage?.imagePath) {
+            baseParams.referenceImagePath = refImage.imagePath
+          }
+        }
       }
 
       if (activeModule === 'stage') {

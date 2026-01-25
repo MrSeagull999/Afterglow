@@ -20,6 +20,7 @@ import {
   Sofa,
   PaintBucket,
   Moon,
+  Lightbulb,
   Eye,
   EyeOff
 } from 'lucide-react'
@@ -27,6 +28,7 @@ import {
 const MODULE_OPTIONS: { value: ModuleType | 'all'; label: string }[] = [
   { value: 'all', label: 'All Modules' },
   { value: 'twilight', label: 'Twilight' },
+  { value: 'relight', label: 'ReLight' },
   { value: 'clean', label: 'Clean Slate' },
   { value: 'stage', label: 'Staging' },
   { value: 'renovate', label: 'Renovate' }
@@ -44,7 +46,8 @@ const MODULE_ICONS: Record<ModuleType, React.ReactNode> = {
   clean: <Eraser className="w-4 h-4" />,
   stage: <Sofa className="w-4 h-4" />,
   renovate: <PaintBucket className="w-4 h-4" />,
-  twilight: <Moon className="w-4 h-4" />
+  twilight: <Moon className="w-4 h-4" />,
+  relight: <Lightbulb className="w-4 h-4" />
 }
 
 type ViewMode = 'assets' | 'versions'
@@ -356,7 +359,7 @@ export function LibraryBrowser() {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowModuleMenu(false)} />
                 <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-700 border border-slate-600 rounded-lg shadow-xl z-20 overflow-hidden">
-                  {(['clean', 'stage', 'renovate', 'twilight'] as ModuleType[]).map((mod) => (
+                  {(['clean', 'stage', 'renovate', 'twilight', 'relight'] as ModuleType[]).map((mod) => (
                     <button
                       key={mod}
                       onClick={() => handleRunModule(mod)}

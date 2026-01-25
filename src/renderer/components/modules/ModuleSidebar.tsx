@@ -6,6 +6,7 @@ import { CleanSlatePanel } from './CleanSlatePanel'
 import { StagingPanel } from './StagingPanel'
 import { RenovatePanel } from './RenovatePanel'
 import { TwilightPanel } from './TwilightPanel'
+import { RelightPanel } from './RelightPanel'
 import { ModuleInputPicker } from './ModuleInputPicker'
 import {
   Sparkles,
@@ -13,6 +14,7 @@ import {
   Sofa,
   PaintBucket,
   Moon,
+  Lightbulb,
   ChevronRight
 } from 'lucide-react'
 
@@ -22,6 +24,12 @@ const MODULES: { id: ModuleType; label: string; icon: React.ReactNode; descripti
     label: 'Twilight',
     icon: <Moon className="w-5 h-5" />,
     description: 'Day to twilight conversion'
+  },
+  {
+    id: 'relight',
+    label: 'ReLight',
+    icon: <Lightbulb className="w-5 h-5" />,
+    description: 'Enhance lighting conditions'
   },
   {
     id: 'clean',
@@ -139,6 +147,7 @@ export function ModuleSidebar() {
             {activeModule === 'stage' && <StagingPanel />}
             {activeModule === 'renovate' && <RenovatePanel />}
             {activeModule === 'twilight' && <TwilightPanel />}
+            {activeModule === 'relight' && <RelightPanel />}
           </div>
         </div>
       )}

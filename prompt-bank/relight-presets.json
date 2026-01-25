@@ -1,0 +1,50 @@
+{
+  "defaultPresetId": "relight_blue_hour",
+  "version": "1.0.0",
+  "presets": [
+    {
+      "id": "relight_sunny_daytime",
+      "label": "Sunny Daytime",
+      "description": "Transform overcast or flat daytime photos into bright, sunny conditions with warm sunlight and blue sky.",
+      "promptTemplate": "Enhance this photograph to appear as if it was taken on a bright, sunny day with ideal lighting conditions.\n\nTransform the sky to display a beautiful clear blue with natural gradation from deeper blue at the top to lighter blue near the horizon. The sunlight should appear warm and natural, creating soft directional lighting that enhances the scene without harsh shadows. If this is an exterior photograph, surfaces should show the gentle warmth of natural sunlight. If this is an interior photograph, windows should show bright blue sky outside and natural daylight should illuminate the space with a clean, neutral-warm quality.\n\nThe lighting transformation should feel completely natural, as if the photograph was actually taken under these ideal sunny conditions rather than artificially processed. Maintain all architectural elements, materials, colors, and composition exactly as shown. The camera angle and perspective must remain unchanged.\n\nThe final result should be photorealistic and suitable for professional real estate marketing.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "relight_blue_hour",
+      "label": "Blue Hour Twilight",
+      "description": "Improve flat or overly warm twilight photos with cooler, more appealing blue hour sky and balanced interior lighting.",
+      "promptTemplate": "Enhance this twilight photograph to capture the beautiful blue hour period with ideal lighting balance.\n\nFor exterior views, transform the sky to display a rich, even blue gradient - starting with deeper, saturated cool blue at the top and gradually transitioning to lighter blue near the horizon. The sky should have good color saturation to create an appealing blue hour look, but remain natural and photorealistic. Avoid warm peach, coral, or orange tones in the sky.\n\nWindows should glow with warm interior light around 3500-4000K - inviting and naturally warm but not overly orange or yellow. The interior lighting should appear as it would in a well-lit home during twilight - warm and welcoming without being artificially saturated.\n\nFor naturally lit exterior areas (decks, patios, outdoor spaces), maintain their natural warm character and proper exposure. These areas should show the natural warmth of wood tones and ambient twilight lighting without being artificially cooled or color-shifted. The deck and outdoor surfaces should retain their authentic material colors and natural appearance.\n\nFor interior views, windows should show the beautiful rich blue hour sky outside with the same saturated blue gradient. Interior lighting should have a warm, inviting quality around 3500-4000K - naturally warm and well-lit without excessive orange or yellow color casts. The space should feel welcoming and professionally photographed.\n\nBalance the cool blue sky with warm interior lighting and natural material tones to create an appealing, professional twilight photograph. The lighting should feel authentic and naturally captured, not artificially processed. Maintain all architectural elements, materials, and composition exactly as shown. The camera angle and perspective must remain unchanged.\n\nThe final result should be photorealistic and suitable for luxury real estate marketing with rich colors and natural balance.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "relight_golden_hour",
+      "label": "Golden Hour",
+      "description": "Add warm, directional golden hour lighting for a premium sunset aesthetic.",
+      "promptTemplate": "Enhance this photograph to capture the beautiful warm light of golden hour, approximately 30-60 minutes before sunset.\n\nThe lighting should have a warm, golden quality with soft directional characteristics. For exterior photographs, surfaces should be bathed in warm, flattering light with a gentle glow. The sky should display warm tones - soft oranges, pinks, and warm blues creating a beautiful gradient. Shadows should be long and soft, not harsh.\n\nFor interior photographs, natural light coming through windows should have this same warm golden quality, creating an inviting and premium atmosphere. The overall color temperature should be warm but not overly saturated - aim for natural golden hour warmth that feels authentic.\n\nThe transformation should appear completely natural, as if the photograph was actually taken during this magical lighting period. Maintain all architectural elements, materials, and composition exactly as shown. The camera angle and perspective must remain unchanged.\n\nThe final result should be photorealistic and suitable for luxury real estate marketing.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    },
+    {
+      "id": "relight_soft_overcast",
+      "label": "Soft Overcast",
+      "description": "Create even, diffused lighting with soft shadows - ideal for showcasing architectural details.",
+      "promptTemplate": "Enhance this photograph with beautiful soft, even lighting as if taken on an overcast day with ideal diffused light conditions.\n\nThe lighting should be soft and even across the entire scene with minimal shadows. For exterior photographs, the sky should appear as a soft, luminous white or light gray - not dark or stormy, but bright and diffused. This creates flattering, shadowless lighting that showcases architectural details beautifully.\n\nFor interior photographs, the lighting should be bright and evenly distributed with a clean, neutral quality. Windows should show soft, diffused daylight coming through. The overall effect should be clean, bright, and professional - ideal for showcasing space and architectural features without dramatic lighting effects.\n\nThe transformation should feel natural and professionally captured. Maintain all architectural elements, materials, and composition exactly as shown. The camera angle and perspective must remain unchanged.\n\nThe final result should be photorealistic and suitable for professional real estate marketing.",
+      "settings": {
+        "previewWidth": 1536,
+        "finalImageSize": "4K",
+        "outputFormatDefault": "png"
+      }
+    }
+  ]
+}

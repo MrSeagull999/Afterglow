@@ -1,3 +1,9 @@
+export interface ReferenceImageInput {
+  imageData: string
+  mimeType: string
+  role: string  // e.g., "lighting reference", "style reference"
+}
+
 export interface ImageGenerationRequest {
   model: string
   prompt: string
@@ -7,6 +13,7 @@ export interface ImageGenerationRequest {
   aspectRatio?: '16:9' | '4:3' | '1:1' | string
   seed?: number | null
   priorityMode?: boolean
+  referenceImages?: ReferenceImageInput[]
 }
 
 export interface ImageGenerationResponse {

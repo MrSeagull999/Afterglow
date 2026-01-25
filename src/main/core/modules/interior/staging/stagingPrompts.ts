@@ -11,40 +11,31 @@ export function buildStagingPrompt(params: StagingPromptParams): string {
   const roomType = params.roomType || 'room'
   const style = params.style || 'modern contemporary'
 
-  return `Virtually stage this empty ${roomType} with realistic, high-quality furniture and decor in a ${style} style. Requirements:
-1) Add appropriate furniture for a ${roomType}: select pieces that are proportional to the space and professionally arranged.
-2) Use a cohesive ${style} design aesthetic throughout - furniture, textiles, and accessories should complement each other.
-3) Include realistic soft furnishings: rugs, cushions, throws, and curtains where appropriate.
-4) Add tasteful decor: artwork, plants, lamps, and decorative objects that enhance the space without cluttering.
-5) Ensure all furniture is properly grounded with realistic shadows and reflections.
-6) PRESERVE all architectural elements exactly: walls, floors, ceilings, windows, doors, and built-in features.
-7) PRESERVE all surface materials - do not change paint colors, flooring, or any existing finishes.
-8) Maintain consistent lighting that matches the original photograph.
-9) The result must be photorealistic and suitable for professional real estate marketing.
-10) Maintain the exact same camera angle and perspective.
-11) Furniture placement should feel natural and allow for realistic traffic flow through the space.`
+  return `Virtually stage this empty ${roomType} with realistic furniture and decor in a ${style} style, creating a professionally photographed space suitable for luxury real estate marketing.
+
+Add appropriate furniture for a ${roomType} that is proportional to the space and professionally arranged. Use a cohesive ${style} design aesthetic throughout - furniture, textiles, and accessories should complement each other naturally. Include realistic soft furnishings like rugs, cushions, throws, and curtains where appropriate. Add tasteful decor such as artwork, plants, lamps, and decorative objects that enhance the space without cluttering it.
+
+All furniture should be properly grounded with realistic shadows and reflections, appearing as if it was actually photographed in this space. Furniture placement should feel natural and allow for realistic traffic flow through the room.
+
+Preserve all architectural elements exactly as shown - walls, floors, ceilings, windows, doors, and built-in features must remain unchanged. Do not alter any surface materials, paint colors, flooring, or existing finishes. Maintain the same lighting conditions and camera angle as the original photograph.
+
+The final result should be photorealistic and indistinguishable from an actual professionally staged and photographed property.`
 }
 
 export function buildSecondaryAnglePrompt(params: SecondaryAnglePromptParams): string {
   const roomType = params.roomType || 'room'
   const style = params.style || 'modern contemporary'
 
-  return `Virtually stage this empty ${roomType} to match an existing staged view of the same space. You must recreate the EXACT same furniture from a different camera angle.
+  return `Virtually stage this empty ${roomType} to match an existing staged view of the same space. You are viewing the same room from a different camera angle and must recreate the exact same furniture arrangement.
 
-FURNITURE SPECIFICATION TO MATCH:
+The furniture specification from the master view:
 ${params.furnitureSpec}
 
-Requirements:
-1) Place the EXACT same furniture items as specified above - same pieces, same positions relative to the room.
-2) Adjust the furniture appearance for this camera angle - you are viewing the same items from a different perspective.
-3) Maintain the same ${style} design aesthetic and color palette.
-4) Ensure furniture positions are physically consistent with the master view - items should be in the same locations.
-5) Add the same soft furnishings and decor items visible from this angle.
-6) PRESERVE all architectural elements exactly: walls, floors, ceilings, windows, doors, and built-in features.
-7) PRESERVE all surface materials - do not change paint colors, flooring, or any existing finishes.
-8) Maintain consistent lighting that matches the original photograph.
-9) The result must be photorealistic and suitable for professional real estate marketing.
-10) Maintain the exact same camera angle and perspective of this input image.`
+Place the exact same furniture items as specified above in the same positions relative to the room. You are simply viewing these same pieces from a different perspective - adjust their appearance for this camera angle accordingly. Maintain the same ${style} design aesthetic and color palette. Ensure furniture positions are physically consistent with the master view so items appear in the same locations when viewed from this angle. Include the same soft furnishings and decor items that would be visible from this perspective.
+
+Preserve all architectural elements exactly as shown - walls, floors, ceilings, windows, doors, and built-in features must remain unchanged. Do not alter any surface materials, paint colors, flooring, or existing finishes. Maintain the same lighting conditions and camera angle as this input photograph.
+
+The final result should be photorealistic and suitable for professional real estate marketing.`
 }
 
 export const ROOM_TYPES = [

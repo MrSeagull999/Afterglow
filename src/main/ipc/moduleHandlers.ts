@@ -7,7 +7,7 @@ import { generationLogger } from '../core/services/generation/generationLogger'
 import { estimateExtendedCost, getCostPerImage } from '../core/costEstimate'
 import { getSettings } from '../core/settings'
 import { getResolvedProviderConfig } from '../../shared/services/provider/resolvedProviderConfig'
-import { getPreset } from '../core/promptBank'
+import { getPresets, getPreset, getRelightPreset } from '../core/promptBank'
 import { createFinalFromApprovedVersion, createNative4KFromApprovedVersion } from '../core/store/versionStore'
 import { setWorkingSource } from '../core/store/assetStore'
 
@@ -32,6 +32,11 @@ import {
   generateTwilightPreview,
   TwilightParams
 } from '../core/modules/twilight/twilightModule'
+
+import {
+  generateRelightPreview,
+  RelightParams
+} from '../core/modules/relight/relightModule'
 
 import {
   createFurnitureSpec,
@@ -62,7 +67,7 @@ export function registerModuleHandlers(): void {
   })
 
   // Guardrail handlers
-  ipcMain.handle('guardrails:getForModule', async (_event, module: 'clean' | 'stage' | 'renovate' | 'twilight') => {
+  ipcMain.handle('guardrails:getForModule', async (_event, module: 'clean' | 'stage' | 'renovate' | 'twilight' | 'relight') => {
     return getGuardrailsForModule(module)
   })
 
@@ -112,6 +117,15 @@ export function registerModuleHandlers(): void {
     generateVersionPreview(params.jobId, version.id, (progress) => {
       sendProgress(version.id, progress)
     }).catch(err => console.error('[Twilight] Generation error:', err))
+    return version
+  })
+
+  // ReLight module
+  ipcMain.handle('module:relight:generatePreview', async (_event, params: RelightParams) => {
+    const version = await generateRelightPreview(params)
+    generateVersionPreview(params.jobId, version.id, (progress) => {
+      sendProgress(version.id, progress)
+    }).catch(err => console.error('[ReLight] Generation error:', err))
     return version
   })
 
@@ -314,6 +328,7 @@ export function registerModuleHandlers(): void {
     injectorIds?: string[]
     guardrailIds?: string[]
     customInstructions?: string
+    referenceImagePath?: string
   }) => {
     const {
       jobId,
@@ -324,7 +339,8 @@ export function registerModuleHandlers(): void {
       sourceVersionIdByAssetId,
       injectorIds,
       guardrailIds,
-      customInstructions
+      customInstructions,
+      referenceImagePath
     } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
@@ -347,12 +363,73 @@ export function registerModuleHandlers(): void {
           lightingCondition: lightingCondition || 'overcast',
           injectorIds: injectorIds || [],
           customGuardrails: guardrailIds || [],
-          customInstructions: customInstructions || ''
+          customInstructions: customInstructions || '',
+          referenceImagePath
         })
         
         generateVersionPreview(jobId, version.id, (progress) => {
           sendProgress(version.id, progress)
         }).catch(err => console.error('[Twilight Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // Batch ReLight generation
+  ipcMain.handle('module:relight:batchGenerate', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    presetId?: string
+    promptTemplate?: string
+    sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+    customInstructions?: string
+    referenceImagePath?: string
+  }) => {
+    const {
+      jobId,
+      assetIds,
+      presetId,
+      promptTemplate,
+      sourceVersionIdByAssetId,
+      injectorIds,
+      guardrailIds,
+      customInstructions,
+      referenceImagePath
+    } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    const effectivePresetId = presetId || 'relight_blue_hour'
+    const preset = await getRelightPreset(effectivePresetId)
+    const template = promptTemplate || preset?.promptTemplate || ''
+
+    if (!template || template.trim().length === 0) {
+      throw new Error(`ReLight batchGenerate missing promptTemplate and preset not found/empty: ${effectivePresetId}`)
+    }
+
+    for (const assetId of assetIds) {
+      try {
+        const version = await generateRelightPreview({
+          jobId,
+          assetId,
+          sourceVersionId: sourceVersionIdByAssetId?.[assetId],
+          presetId: effectivePresetId,
+          promptTemplate: template,
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || [],
+          customInstructions: customInstructions || '',
+          referenceImagePath
+        })
+        
+        generateVersionPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[ReLight Batch] Generation error:', err))
         
         results.push({ assetId, versionId: version.id })
       } catch (error) {
@@ -495,6 +572,7 @@ export function registerModuleHandlers(): void {
     injectorIds?: string[]
     guardrailIds?: string[]
     customInstructions?: string
+    referenceImagePath?: string
   }) => {
     const {
       jobId,
@@ -505,7 +583,8 @@ export function registerModuleHandlers(): void {
       sourceVersionIdByAssetId,
       injectorIds,
       guardrailIds,
-      customInstructions
+      customInstructions,
+      referenceImagePath
     } = params
     const results: { assetId: string; versionId?: string; error?: string }[] = []
 
@@ -528,12 +607,73 @@ export function registerModuleHandlers(): void {
           lightingCondition: lightingCondition || 'overcast',
           injectorIds: injectorIds || [],
           customGuardrails: guardrailIds || [],
-          customInstructions: customInstructions || ''
+          customInstructions: customInstructions || '',
+          referenceImagePath
         })
         
         generateVersionHQPreview(jobId, version.id, (progress) => {
           sendProgress(version.id, progress)
         }).catch(err => console.error('[Twilight HQ Batch] Generation error:', err))
+        
+        results.push({ assetId, versionId: version.id })
+      } catch (error) {
+        results.push({ assetId, error: error instanceof Error ? error.message : 'Unknown error' })
+      }
+    }
+
+    return results
+  })
+
+  // HQ Batch ReLight generation
+  ipcMain.handle('module:relight:batchGenerateHQ', async (_event, params: {
+    jobId: string
+    assetIds: string[]
+    presetId?: string
+    promptTemplate?: string
+    sourceVersionIdByAssetId?: Record<string, string>
+    injectorIds?: string[]
+    guardrailIds?: string[]
+    customInstructions?: string
+    referenceImagePath?: string
+  }) => {
+    const {
+      jobId,
+      assetIds,
+      presetId,
+      promptTemplate,
+      sourceVersionIdByAssetId,
+      injectorIds,
+      guardrailIds,
+      customInstructions,
+      referenceImagePath
+    } = params
+    const results: { assetId: string; versionId?: string; error?: string }[] = []
+
+    const effectivePresetId = presetId || 'relight_blue_hour'
+    const preset = await getRelightPreset(effectivePresetId)
+    const template = promptTemplate || preset?.promptTemplate || ''
+
+    if (!template || template.trim().length === 0) {
+      throw new Error(`ReLight HQ batchGenerate missing promptTemplate and preset not found/empty: ${effectivePresetId}`)
+    }
+
+    for (const assetId of assetIds) {
+      try {
+        const version = await generateRelightPreview({
+          jobId,
+          assetId,
+          sourceVersionId: sourceVersionIdByAssetId?.[assetId],
+          presetId: effectivePresetId,
+          promptTemplate: template,
+          injectorIds: injectorIds || [],
+          customGuardrails: guardrailIds || [],
+          customInstructions: customInstructions || '',
+          referenceImagePath
+        })
+        
+        generateVersionHQPreview(jobId, version.id, (progress) => {
+          sendProgress(version.id, progress)
+        }).catch(err => console.error('[ReLight HQ Batch] Generation error:', err))
         
         results.push({ assetId, versionId: version.id })
       } catch (error) {

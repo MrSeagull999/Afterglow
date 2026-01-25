@@ -2,7 +2,7 @@ export interface Guardrail {
   id: string
   label: string
   promptFragment: string
-  appliesTo: ('clean' | 'stage' | 'renovate' | 'twilight')[]
+  appliesTo: ('clean' | 'stage' | 'renovate' | 'twilight' | 'relight')[]
 }
 
 export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
@@ -46,7 +46,7 @@ export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
     id: 'preserve_camera_angle',
     label: 'Preserve Camera Angle',
     promptFragment: 'Maintain the exact same camera angle, perspective, and field of view.',
-    appliesTo: ['clean', 'stage', 'renovate', 'twilight']
+    appliesTo: ['clean', 'stage', 'renovate', 'twilight', 'relight']
   },
   {
     id: 'preserve_lighting_fixtures',
@@ -58,27 +58,17 @@ export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
     id: 'photorealistic',
     label: 'Photorealistic Quality',
     promptFragment: 'The result must be photorealistic and indistinguishable from a professional real estate photograph.',
-    appliesTo: ['clean', 'stage', 'renovate', 'twilight']
+    appliesTo: ['clean', 'stage', 'renovate', 'twilight', 'relight']
   },
   {
     id: 'realistic_scale',
     label: 'Realistic Furniture Scale',
-    promptFragment: `CRITICAL FURNITURE SCALE REQUIREMENT: All furniture must be rendered at REAL-WORLD dimensions - do NOT shrink, miniaturize, or scale down furniture to make it "fit nicely" or look aesthetically balanced. The goal is photorealism, not visual harmony.
-
-REAL-WORLD FURNITURE SIZES (these are NON-NEGOTIABLE):
-- Queen bed: 1.5m wide × 2.0m long (will dominate a small bedroom - this is CORRECT)
-- Single bed: 0.9m wide × 1.9m long
-- Bedside table: 0.5m wide × 0.6m tall
-- Standard desk: 1.2m wide × 0.6m deep
-- 3-seater sofa: 2.0-2.4m wide
-- Standard door: 2.1m tall (use as visual scale reference)
-
-If standard furniture would make the room look cramped or cluttered, that is the CORRECT result for a small room. Do NOT artificially shrink furniture to create more visual space. If furniture truly cannot fit, use FEWER pieces or choose appropriately SMALLER furniture types (e.g., single bed instead of queen), but never shrink standard furniture below real-world dimensions.`,
+    promptFragment: `All furniture must be rendered at accurate real-world dimensions. A queen bed is 1.5m wide by 2.0m long, a standard sofa is 2.0-2.4m wide, and doors are typically 2.1m tall - use these as visual scale references. If standard-sized furniture would make a small room look cramped or cluttered, that is the correct and realistic result. Choose fewer pieces or smaller furniture types like a single bed instead of a queen, but never artificially shrink furniture below real-world dimensions to create more visual space.`,
     appliesTo: ['stage']
   }
 ]
 
-export function getGuardrailsForModule(module: 'clean' | 'stage' | 'renovate' | 'twilight'): Guardrail[] {
+export function getGuardrailsForModule(module: 'clean' | 'stage' | 'renovate' | 'twilight' | 'relight'): Guardrail[] {
   return ARCHITECTURAL_GUARDRAILS.filter(g => g.appliesTo.includes(module))
 }
 
@@ -87,6 +77,6 @@ export function buildGuardrailPrompt(guardrailIds: string[]): string {
   return guardrails.map(g => g.promptFragment).join(' ')
 }
 
-export function getDefaultGuardrailIds(module: 'clean' | 'stage' | 'renovate' | 'twilight'): string[] {
+export function getDefaultGuardrailIds(module: 'clean' | 'stage' | 'renovate' | 'twilight' | 'relight'): string[] {
   return getGuardrailsForModule(module).map(g => g.id)
 }

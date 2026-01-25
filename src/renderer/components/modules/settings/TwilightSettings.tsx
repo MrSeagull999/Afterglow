@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useModuleStore } from '../../../store/useModuleStore'
 import { Sun, Cloud } from 'lucide-react'
+import { ReferenceSelector } from '../../shared/ReferenceSelector'
 
 export function TwilightSettings() {
   const {
@@ -9,7 +10,8 @@ export function TwilightSettings() {
     toggleInjector,
     twilightSettings,
     setTwilightPresetId,
-    setTwilightLightingCondition
+    setTwilightLightingCondition,
+    setTwilightReferenceImage
   } = useModuleStore()
 
   const [twilightPresets, setTwilightPresets] = useState<any[]>([])
@@ -91,6 +93,16 @@ export function TwilightSettings() {
             Sunny
           </button>
         </div>
+      </div>
+
+      {/* Reference Image */}
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">Reference Image</label>
+        <ReferenceSelector
+          module="twilight"
+          selectedReferenceId={twilightSettings.referenceImageId}
+          onSelect={setTwilightReferenceImage}
+        />
       </div>
 
       {/* Injectors */}

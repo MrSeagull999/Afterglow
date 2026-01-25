@@ -17,7 +17,7 @@ export class GoogleGeminiProvider implements IImageProvider {
       return { success: false, error: 'Google API key not configured' }
     }
 
-    const { prompt, imageData, mimeType, model, imageSize = '1024x1024', aspectRatio, seed } = request
+    const { prompt, imageData, mimeType, model, imageSize = '1024x1024', aspectRatio, seed, referenceImages } = request
     const includeSeed = seed !== null && seed !== undefined
 
     try {
@@ -29,8 +29,11 @@ export class GoogleGeminiProvider implements IImageProvider {
       if (aspectRatio) {
         console.log(`[GoogleGeminiProvider] Aspect ratio: ${aspectRatio}`)
       }
+      if (referenceImages && referenceImages.length > 0) {
+        console.log(`[GoogleGeminiProvider] Reference images: ${referenceImages.length}`)
+      }
       
-      let response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, aspectRatio, seed ?? null, includeSeed)
+      let response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, aspectRatio, seed ?? null, includeSeed, referenceImages)
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -39,7 +42,7 @@ export class GoogleGeminiProvider implements IImageProvider {
         // Retry without seed if seed was rejected
         if (includeSeed && this.isSeedRejectionError(errorText)) {
           console.log('[GoogleGeminiProvider] Seed rejected, retrying without seed...')
-          response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, aspectRatio, null, false)
+          response = await this.makeRequest(model, prompt, imageData, mimeType, imageSize, aspectRatio, null, false, referenceImages)
           
           if (!response.ok) {
             const retryErrorText = await response.text()
@@ -78,6 +81,14 @@ export class GoogleGeminiProvider implements IImageProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       console.error('[GoogleGeminiProvider] Error:', message)
+      if (error instanceof Error) {
+        console.error('[GoogleGeminiProvider] Error details:', {
+          name: error.name,
+          message: error.message,
+          cause: (error as any).cause,
+          code: (error as any).code
+        })
+      }
       return { success: false, error: message }
     }
   }
@@ -90,9 +101,13 @@ export class GoogleGeminiProvider implements IImageProvider {
     imageSize: string,
     aspectRatio: string | undefined,
     seed: number | null,
-    includeSeed: boolean
+    includeSeed: boolean,
+    referenceImages?: Array<{ imageData: string; mimeType: string; role: string }>
   ): Promise<Response> {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`
+    
+    // Set timeout based on image size - 4K takes much longer, especially with complex prompts
+    const timeoutMs = imageSize === '4K' ? 600000 : 120000 // 10 min for 4K, 2 min for others
     
     const generationConfig: Record<string, unknown> = {
       responseModalities: ['IMAGE']
@@ -138,28 +153,75 @@ export class GoogleGeminiProvider implements IImageProvider {
       generationConfig.imageConfig = imageConfig
       console.log(`[GoogleGeminiProvider] imageConfig:`, JSON.stringify(imageConfig))
     }
+
+    // Build parts array with prompt, source image, and optional reference images
+    // For multi-image composition with Nano Banana Pro:
+    // - Image 1: source photograph to enhance
+    // - Image 2+: reference images with role assignments
+    const parts: Array<Record<string, unknown>> = []
+
+    // Build prompt with reference image role assignments if present
+    let fullPrompt = prompt
+    if (referenceImages && referenceImages.length > 0) {
+      const roleAssignments = [
+        'Image 1: source photograph to enhance - preserve all architectural elements and composition'
+      ]
+      referenceImages.forEach((ref, index) => {
+        roleAssignments.push(`Image ${index + 2}: ${ref.role}`)
+      })
+      fullPrompt = `${roleAssignments.join('\n')}\n\n${prompt}`
+      console.log(`[GoogleGeminiProvider] Using ${referenceImages.length} reference image(s)`)
+    }
+
+    parts.push({ text: fullPrompt })
+    
+    // Add source image (Image 1)
+    parts.push({
+      inlineData: {
+        mimeType: mimeType,
+        data: imageData
+      }
+    })
+
+    // Add reference images (Image 2+)
+    if (referenceImages && referenceImages.length > 0) {
+      for (const ref of referenceImages) {
+        parts.push({
+          inlineData: {
+            mimeType: ref.mimeType,
+            data: ref.imageData
+          }
+        })
+      }
+    }
     
     const body = {
       contents: [{
         role: 'user',
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: imageData
-            }
-          }
-        ]
+        parts
       }],
       generationConfig
     }
     
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      return response
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs / 1000}s`)
+      }
+      throw error
+    }
   }
 
   private isSeedRejectionError(errorText: string): boolean {

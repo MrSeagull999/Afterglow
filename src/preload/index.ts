@@ -5,6 +5,7 @@ export interface ElectronAPI {
   scanDirectory: (dirPath: string) => Promise<any[]>
   getPresets: () => Promise<any[]>
   getPreset: (presetId: string) => Promise<any>
+  getRelightPresets: () => Promise<any[]>
   createRun: (params: any) => Promise<any>
   getRun: (runId: string) => Promise<any>
   updateRun: (runId: string, updates: any) => Promise<any>
@@ -25,6 +26,12 @@ export interface ElectronAPI {
   updateSettings: (updates: any) => Promise<any>
   readImageAsDataURL: (imagePath: string) => Promise<string | null>
   assemblePrompt: (basePrompt: string, lightingCondition: 'overcast' | 'sunny', customPrompt?: string) => Promise<string>
+  getReferenceImages: (module: string) => Promise<any[]>
+  getReferenceImage: (module: string, id: string) => Promise<any | null>
+  addReferenceImage: (params: { module: string; name: string; sourceImagePath: string; description?: string }) => Promise<any>
+  deleteReferenceImage: (module: string, id: string) => Promise<void>
+  updateReferenceImage: (params: { module: string; id: string; name?: string; description?: string }) => Promise<any>
+  selectReferenceFile: () => Promise<string | null>
   onPreviewProgress: (callback: (data: any) => void) => () => void
   onBatchProgress: (callback: (data: any) => void) => () => void
   onBatchStatus: (callback: (data: any) => void) => () => void
@@ -37,6 +44,7 @@ const electronAPI: ElectronAPI = {
   scanDirectory: (dirPath) => ipcRenderer.invoke('scan:directory', dirPath),
   getPresets: () => ipcRenderer.invoke('presets:getAll'),
   getPreset: (presetId) => ipcRenderer.invoke('presets:get', presetId),
+  getRelightPresets: () => ipcRenderer.invoke('presets:getRelight'),
   createRun: (params) => ipcRenderer.invoke('run:create', params),
   getRun: (runId) => ipcRenderer.invoke('run:get', runId),
   updateRun: (runId, updates) => ipcRenderer.invoke('run:update', runId, updates),
@@ -60,6 +68,12 @@ const electronAPI: ElectronAPI = {
   readImageAsDataURL: (imagePath) => ipcRenderer.invoke('image:readAsDataURL', imagePath),
   assemblePrompt: (basePrompt, lightingCondition, customPrompt) => 
     ipcRenderer.invoke('prompt:assemble', basePrompt, lightingCondition, customPrompt),
+  getReferenceImages: (module) => ipcRenderer.invoke('references:getForModule', module),
+  getReferenceImage: (module, id) => ipcRenderer.invoke('references:get', module, id),
+  addReferenceImage: (params) => ipcRenderer.invoke('references:add', params),
+  deleteReferenceImage: (module, id) => ipcRenderer.invoke('references:delete', module, id),
+  updateReferenceImage: (params) => ipcRenderer.invoke('references:update', params),
+  selectReferenceFile: () => ipcRenderer.invoke('references:selectFile'),
   
   onPreviewProgress: (callback) => {
     const handler = (_: any, data: any) => callback(data)

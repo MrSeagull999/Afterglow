@@ -6,6 +6,7 @@ import { generateSeed } from '../../gemini/geminiClient'
 import { getSettings } from '../../settings'
 import { saveImageWithExifHandling } from '../../exif'
 import type { Version, ModuleType } from '../../../../shared/types'
+import type { ReferenceImageInput } from '../../providers/IImageProvider'
 import {
   getVersion,
   setVersionStatus,
@@ -18,6 +19,34 @@ import { getResolvedImageProvider } from '../../providers/providerRouter'
 import { generationLogger } from '../../services/generation/generationLogger'
 import { assemblePrompt } from '../../../../shared/services/prompt/promptAssembler'
 import { v4 as uuidv4 } from 'uuid'
+
+/**
+ * Load a reference image from disk and prepare it for the API
+ */
+async function loadReferenceImage(imagePath: string, role: string): Promise<ReferenceImageInput | null> {
+  if (!imagePath || !existsSync(imagePath)) {
+    console.log(`[GenerateService] Reference image not found: ${imagePath}`)
+    return null
+  }
+
+  try {
+    const imageBuffer = await readFile(imagePath)
+    const base64Image = imageBuffer.toString('base64')
+    const ext = imagePath.toLowerCase().split('.').pop()
+    let mimeType = 'image/jpeg'
+    if (ext === 'png') mimeType = 'image/png'
+    else if (ext === 'webp') mimeType = 'image/webp'
+
+    return {
+      imageData: base64Image,
+      mimeType,
+      role
+    }
+  } catch (error) {
+    console.error(`[GenerateService] Failed to load reference image: ${error}`)
+    return null
+  }
+}
 
 export const HQ_PREVIEW_REQUIRES_APPROVAL = false
 export const HQ_PREVIEW_AUTO_APPROVES = false
@@ -196,6 +225,25 @@ export async function generateVersionPreview(
       })
     }
     
+    // Load reference image if specified in recipe
+    const referenceImagePath = version.recipe.settings.referenceImagePath as string | undefined
+    const referenceImages: ReferenceImageInput[] = []
+    if (referenceImagePath) {
+      console.log(`[GenerateService] Reference image path in recipe: ${referenceImagePath}`)
+      const refImage = await loadReferenceImage(
+        referenceImagePath,
+        'lighting reference - apply the exact lighting conditions, sky color and gradient, interior light color temperature, and ambient atmosphere from this reference'
+      )
+      if (refImage) {
+        referenceImages.push(refImage)
+        console.log(`[GenerateService] ✓ Reference image LOADED for ${version.module} (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+      } else {
+        console.log(`[GenerateService] ✗ Reference image FAILED to load for ${version.module}`)
+      }
+    } else {
+      console.log(`[GenerateService] No reference image specified for ${version.module}`)
+    }
+
     const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
@@ -203,7 +251,8 @@ export async function generateVersionPreview(
       model,
       imageSize: '1024x1024',
       seed,
-      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter'
+      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter',
+      referenceImages: referenceImages.length > 0 ? referenceImages : undefined
     })
 
     onProgress?.(80)
@@ -383,6 +432,25 @@ export async function generateVersionHQPreview(
       ? `${resolved.endpointBaseUrl}/chat/completions`
       : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
 
+    // Load reference image if specified in recipe
+    const referenceImagePath = version.recipe.settings.referenceImagePath as string | undefined
+    const referenceImages: ReferenceImageInput[] = []
+    if (referenceImagePath) {
+      console.log(`[GenerateService] HQ Preview: Reference image path in recipe: ${referenceImagePath}`)
+      const refImage = await loadReferenceImage(
+        referenceImagePath,
+        'lighting reference - apply the exact lighting conditions, sky color and gradient, interior light color temperature, and ambient atmosphere from this reference'
+      )
+      if (refImage) {
+        referenceImages.push(refImage)
+        console.log(`[GenerateService] HQ Preview: ✓ Reference image LOADED for ${version.module} (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+      } else {
+        console.log(`[GenerateService] HQ Preview: ✗ Reference image FAILED to load for ${version.module}`)
+      }
+    } else {
+      console.log(`[GenerateService] HQ Preview: No reference image specified for ${version.module}`)
+    }
+
     const response = await provider.generateImage({
       prompt: fullPrompt,
       imageData: base64Image,
@@ -390,7 +458,8 @@ export async function generateVersionHQPreview(
       model,
       imageSize: '1536x1536',
       seed,
-      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter'
+      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter',
+      referenceImages: referenceImages.length > 0 ? referenceImages : undefined
     })
 
     generationLogger.log({
@@ -696,19 +765,29 @@ export async function generateVersionNative4K(
 
     // For 4K generation, we send the image at high resolution
     // The API will generate at native 4K (3840x2160 for 16:9)
+    // Note: Input size must be reasonable to avoid request payload size limits
     const settings = await getSettings()
-    const targetWidth = 3840 // Max input dimension for 4K generation
+    const targetWidth = 2048 // Max input dimension - reduced to prevent payload size issues
 
     let resizedBuffer: Buffer = imageBuffer as Buffer
     if (metadata.width && metadata.width > targetWidth) {
       resizedBuffer = await sharp(imageBuffer)
         .resize(targetWidth, null, { withoutEnlargement: true })
+        .jpeg({ quality: 85 }) // Convert to JPEG to reduce size
+        .toBuffer() as Buffer
+    } else {
+      // Even if not resizing, convert to JPEG to reduce payload size
+      resizedBuffer = await sharp(imageBuffer)
+        .jpeg({ quality: 85 })
         .toBuffer() as Buffer
     }
 
     onProgress?.(30)
 
     const base64Image = resizedBuffer.toString('base64')
+    const payloadSizeMB = (base64Image.length / 1024 / 1024).toFixed(2)
+    console.log(`[GenerateService] Native 4K: Base64 payload size: ${payloadSizeMB}MB`)
+    
     const mimeType = getMimeType(inputPath)
 
     // Reuse EXACT prompt, seed, and settings from approved version

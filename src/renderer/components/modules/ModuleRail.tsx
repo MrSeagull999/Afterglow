@@ -5,6 +5,7 @@ import {
   Eraser,
   Sofa,
   PaintBucket,
+  Lightbulb,
   Grid3X3,
   Settings
 } from 'lucide-react'
@@ -18,8 +19,9 @@ interface ModuleRailProps {
 
 const MODULES: { id: ModuleType; icon: React.ReactNode; label: string; color: string }[] = [
   { id: 'twilight', icon: <Moon className="w-5 h-5" />, label: 'Twilight', color: 'text-indigo-400' },
+  { id: 'relight', icon: <Lightbulb className="w-5 h-5" />, label: 'ReLight', color: 'text-amber-400' },
   { id: 'clean', icon: <Eraser className="w-5 h-5" />, label: 'Clean Slate', color: 'text-emerald-400' },
-  { id: 'stage', icon: <Sofa className="w-5 h-5" />, label: 'Staging', color: 'text-amber-400' },
+  { id: 'stage', icon: <Sofa className="w-5 h-5" />, label: 'Staging', color: 'text-orange-400' },
   { id: 'renovate', icon: <PaintBucket className="w-5 h-5" />, label: 'Renovate', color: 'text-purple-400' }
 ]
 

@@ -1,6 +1,6 @@
 import React from 'react'
 import type { ModuleType } from '../../../shared/types'
-import { Moon, Eraser, Sofa, PaintBucket } from 'lucide-react'
+import { Moon, Eraser, Sofa, PaintBucket, Lightbulb } from 'lucide-react'
 
 export interface ToolDockProps {
   activeModule: ModuleType | null
@@ -9,8 +9,9 @@ export interface ToolDockProps {
 
 const TOOLS: { id: ModuleType; label: string; icon: React.ReactNode; color: string }[] = [
   { id: 'twilight', label: 'Twilight', icon: <Moon className="w-4 h-4" />, color: 'text-indigo-400' },
+  { id: 'relight', label: 'ReLight', icon: <Lightbulb className="w-4 h-4" />, color: 'text-amber-400' },
   { id: 'clean', label: 'Clean Slate', icon: <Eraser className="w-4 h-4" />, color: 'text-emerald-400' },
-  { id: 'stage', label: 'Staging', icon: <Sofa className="w-4 h-4" />, color: 'text-amber-400' },
+  { id: 'stage', label: 'Staging', icon: <Sofa className="w-4 h-4" />, color: 'text-orange-400' },
   { id: 'renovate', label: 'Renovate', icon: <PaintBucket className="w-4 h-4" />, color: 'text-purple-400' }
 ]
 

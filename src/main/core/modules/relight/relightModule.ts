@@ -13,15 +13,14 @@ import {
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../shared/injectorRegistry'
 import { PromptAssembler } from '../../services/prompt/promptAssembler'
-import { buildTwilightPreviewBasePrompt } from '../../../../shared/services/prompt/prompts'
+import { buildRelightPreviewBasePrompt } from './relightPrompts'
 
-export interface TwilightParams {
+export interface RelightParams {
   jobId: string
   assetId: string
   sourceVersionId?: string
   presetId: string
   promptTemplate: string
-  lightingCondition?: 'overcast' | 'sunny'
   injectorIds?: string[]
   customGuardrails?: string[]
   customInstructions?: string
@@ -30,7 +29,7 @@ export interface TwilightParams {
   seed?: number | null
 }
 
-export async function generateTwilightPreview(params: TwilightParams): Promise<Version> {
+export async function generateRelightPreview(params: RelightParams): Promise<Version> {
   const asset = await getAsset(params.jobId, params.assetId)
   if (!asset) {
     throw new Error(`Asset not found: ${params.assetId}`)
@@ -44,28 +43,27 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
     }
   }
 
-  const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('twilight')
+  const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('relight')
   const injectorIds = params.injectorIds || []
   const customInstructions = params.customInstructions?.trim() || ''
 
   const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
-  const injectorPrompt = await buildInjectorPromptFromIds('twilight', injectorIds)
+  const injectorPrompt = await buildInjectorPromptFromIds('relight', injectorIds)
   const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
 
   const finalBasePrompt = params.promptTemplate
-  const previewBasePrompt = buildTwilightPreviewBasePrompt(params.promptTemplate, params.lightingCondition)
+  const previewBasePrompt = buildRelightPreviewBasePrompt(params.promptTemplate)
 
   const assembledFinal = await PromptAssembler.assemble({
-    module: 'twilight',
+    module: 'relight',
     basePrompt: finalBasePrompt,
     injectorPrompts,
     guardrailPrompts,
     customInstructions
   })
 
-  // Use PromptAssembler for consistent prompt building and hash generation
   const assembledPreview = await PromptAssembler.assemble({
-    module: 'twilight',
+    module: 'relight',
     basePrompt: previewBasePrompt,
     injectorPrompts,
     guardrailPrompts,
@@ -81,7 +79,6 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
     settings: {
       inputPath,
       presetId: params.presetId,
-      lightingCondition: params.lightingCondition,
       previewBasePrompt,
       customInstructions,
       injectorPrompts,
@@ -96,7 +93,7 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
   const version = await startPreviewGeneration({
     jobId: params.jobId,
     assetId: params.assetId,
-    module: 'twilight',
+    module: 'relight',
     recipe,
     sourceVersionIds: params.sourceVersionId ? [params.sourceVersionId] : [],
     seed: params.seed,
@@ -106,7 +103,7 @@ export async function generateTwilightPreview(params: TwilightParams): Promise<V
   return version
 }
 
-export async function completeTwilightPreview(
+export async function completeRelightPreview(
   jobId: string,
   versionId: string,
   generatedImagePath: string
@@ -115,33 +112,4 @@ export async function completeTwilightPreview(
   const thumbnailPath = getThumbnailPath(jobId, versionId)
 
   return completePreviewGeneration(jobId, versionId, outputPath, thumbnailPath)
-}
-
-export async function failTwilightGeneration(
-  jobId: string,
-  versionId: string,
-  error: string
-): Promise<Version | null> {
-  return failGeneration(jobId, versionId, error)
-}
-
-export async function generateTwilightFinal(
-  jobId: string,
-  versionId: string
-): Promise<Version | null> {
-  const version = await getVersion(jobId, versionId)
-  if (!version) {
-    throw new Error('Version not found')
-  }
-
-  return startFinalGeneration(jobId, versionId)
-}
-
-export async function completeTwilightFinal(
-  jobId: string,
-  versionId: string,
-  generatedImagePath: string
-): Promise<Version | null> {
-  const outputPath = getOutputPath(jobId, versionId, 'final')
-  return completeFinalGeneration(jobId, versionId, outputPath)
 }

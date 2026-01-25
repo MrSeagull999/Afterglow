@@ -1,4 +1,4 @@
-export type PromptModuleType = 'twilight' | 'clean' | 'stage' | 'renovate'
+export type PromptModuleType = 'twilight' | 'clean' | 'stage' | 'renovate' | 'relight'
 
 export type PromptSectionId = 'base' | 'options' | 'guardrails' | 'extra_instructions'
 

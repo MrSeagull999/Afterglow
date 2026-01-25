@@ -5,6 +5,7 @@ import { TwilightSettings } from '../components/modules/settings/TwilightSetting
 import { CleanSlateSettings } from '../components/modules/settings/CleanSlateSettings'
 import { StagingSettings } from '../components/modules/settings/StagingSettings'
 import { RenovateSettings } from '../components/modules/settings/RenovateSettings'
+import { RelightSettings } from '../components/modules/settings/RelightSettings'
 import { resolveGenerationStatus } from '../../shared/resolveGenerationStatus'
 import { useInspectorTruth } from './useInspectorTruth'
 import { useJobStore } from '../store/useJobStore'
@@ -415,6 +416,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
           ) : (
             <div>
               {props.activeModule === 'twilight' && <TwilightSettings />}
+              {props.activeModule === 'relight' && <RelightSettings />}
               {props.activeModule === 'clean' && <CleanSlateSettings />}
               {props.activeModule === 'stage' && <StagingSettings />}
               {props.activeModule === 'renovate' && <RenovateSettings />}

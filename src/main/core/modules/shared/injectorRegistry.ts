@@ -16,7 +16,8 @@ export async function loadInjectorsForModule(module: ModuleType): Promise<Inject
     clean: 'cleanSlate.json',
     stage: 'staging.json',
     renovate: 'renovate.json',
-    twilight: 'twilight.json'
+    twilight: 'twilight.json',
+    relight: 'relight.json'
   }
 
   const filePath = join(INJECTORS_DIR, moduleToFile[module])

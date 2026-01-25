@@ -8,6 +8,7 @@ import {
   Eraser,
   Sofa,
   PaintBucket,
+  Lightbulb,
   ChevronLeft,
   Sparkles,
   Loader2,
@@ -19,6 +20,7 @@ import { TwilightSettings } from './settings/TwilightSettings'
 import { CleanSlateSettings } from './settings/CleanSlateSettings'
 import { StagingSettings } from './settings/StagingSettings'
 import { RenovateSettings } from './settings/RenovateSettings'
+import { RelightSettings } from './settings/RelightSettings'
 
 interface ModuleSettingsPanelProps {
   activeModule: ModuleType
@@ -61,6 +63,13 @@ const MODULE_CONFIG: Record<ModuleType, {
     color: 'text-purple-400',
     bgColor: 'bg-purple-600',
     description: 'Change specific surfaces like floors, walls, and curtains.'
+  },
+  relight: {
+    label: 'ReLight',
+    icon: <Lightbulb className="w-5 h-5" />,
+    color: 'text-amber-400',
+    bgColor: 'bg-amber-600',
+    description: 'Enhance existing photos with improved lighting conditions - fix overcast skies, correct color temperature, or transform flat twilight shots.'
   }
 }
 
@@ -103,6 +112,7 @@ export function ModuleSettingsPanel({
       {/* Module-specific settings */}
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {activeModule === 'twilight' && <TwilightSettings />}
+        {activeModule === 'relight' && <RelightSettings />}
         {activeModule === 'clean' && <CleanSlateSettings />}
         {activeModule === 'stage' && <StagingSettings />}
         {activeModule === 'renovate' && <RenovateSettings />}

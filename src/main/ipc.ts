@@ -12,7 +12,7 @@ import {
   Run,
   ImageEntry
 } from './core/runStore'
-import { getPresets, getPreset } from './core/promptBank'
+import { getPresets, getPreset, getRelightPresets } from './core/promptBank'
 import { generatePreview, generatePreviewBatch } from './core/gemini/previewGenerate'
 import { submitBatch } from './core/gemini/batchSubmit'
 import { pollBatch } from './core/gemini/batchPoll'
@@ -22,8 +22,10 @@ import { stripExif, readExif } from './core/exif'
 import { estimateCost } from './core/costEstimate'
 import { getSettings, updateSettings, Settings } from './core/settings'
 import { assembleTwilightPrompt, LightingCondition } from './core/lightingModifiers'
+import { registerReferenceImageHandlers } from './ipc/referenceImageHandlers'
 
 export function setupIpcHandlers(mainWindow: BrowserWindow): void {
+  registerReferenceImageHandlers()
   ipcMain.handle('scan:directory', async (_, dirPath: string) => {
     return scanDirectory(dirPath)
   })
@@ -34,6 +36,10 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle('presets:get', async (_, presetId: string) => {
     return getPreset(presetId)
+  })
+
+  ipcMain.handle('presets:getRelight', async () => {
+    return getRelightPresets()
   })
 
   ipcMain.handle('run:create', async (_, params: { 

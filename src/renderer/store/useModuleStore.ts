@@ -83,6 +83,14 @@ interface ModuleState {
     presetId: string
     lightingCondition: 'overcast' | 'sunny'
     customInstructions: string
+    referenceImageId: string | null
+  }
+
+  relightSettings: {
+    sourceVersionId: string | null
+    presetId: string
+    customInstructions: string
+    referenceImageId: string | null
   }
 
   // Generation state
@@ -131,6 +139,13 @@ interface ModuleState {
   setTwilightPresetId: (presetId: string) => void
   setTwilightLightingCondition: (condition: 'overcast' | 'sunny') => void
   setTwilightCustomInstructions: (instructions: string) => void
+  setTwilightReferenceImage: (referenceImageId: string | null) => void
+
+  // ReLight
+  setRelightSourceVersion: (versionId: string | null) => void
+  setRelightPresetId: (presetId: string) => void
+  setRelightCustomInstructions: (instructions: string) => void
+  setRelightReferenceImage: (referenceImageId: string | null) => void
 
   // Generation
   setIsGenerating: (isGenerating: boolean) => void
@@ -203,7 +218,15 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
     sourceVersionId: null,
     presetId: 'twilight_exterior_classic',
     lightingCondition: 'overcast',
-    customInstructions: ''
+    customInstructions: '',
+    referenceImageId: null
+  },
+
+  relightSettings: {
+    sourceVersionId: null,
+    presetId: 'relight_blue_hour',
+    customInstructions: '',
+    referenceImageId: null
   },
 
   isGenerating: false,
@@ -362,6 +385,32 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       twilightSettings: { ...state.twilightSettings, customInstructions: instructions }
     })),
 
+  setTwilightReferenceImage: (referenceImageId: string | null) =>
+    set((state) => ({
+      twilightSettings: { ...state.twilightSettings, referenceImageId }
+    })),
+
+  // ReLight
+  setRelightSourceVersion: (versionId) =>
+    set((state) => ({
+      relightSettings: { ...state.relightSettings, sourceVersionId: versionId }
+    })),
+
+  setRelightPresetId: (presetId) =>
+    set((state) => ({
+      relightSettings: { ...state.relightSettings, presetId }
+    })),
+
+  setRelightCustomInstructions: (instructions) =>
+    set((state) => ({
+      relightSettings: { ...state.relightSettings, customInstructions: instructions }
+    })),
+
+  setRelightReferenceImage: (referenceImageId: string | null) =>
+    set((state) => ({
+      relightSettings: { ...state.relightSettings, referenceImageId }
+    })),
+
   // Generation
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setGeneratingVersionId: (versionId) => set({ generatingVersionId: versionId }),
@@ -419,7 +468,14 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         sourceVersionId: null,
         presetId: 'twilight_exterior_classic',
         lightingCondition: 'overcast',
-        customInstructions: ''
+        customInstructions: '',
+        referenceImageId: null
+      },
+      relightSettings: {
+        sourceVersionId: null,
+        presetId: 'relight_blue_hour',
+        customInstructions: '',
+        referenceImageId: null
       },
       isGenerating: false,
       generatingVersionId: null
