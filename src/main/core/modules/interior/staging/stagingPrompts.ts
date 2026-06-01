@@ -5,6 +5,7 @@ export interface StagingPromptParams {
 
 export interface SecondaryAnglePromptParams extends StagingPromptParams {
   furnitureSpec: string
+  hasVisualReference?: boolean
 }
 
 export function buildStagingPrompt(params: StagingPromptParams): string {
@@ -26,6 +27,23 @@ export function buildSecondaryAnglePrompt(params: SecondaryAnglePromptParams): s
   const roomType = params.roomType || 'room'
   const style = params.style || 'modern contemporary'
 
+  if (params.hasVisualReference) {
+    // With visual references, guide the model to transfer staging intent, not camera composition.
+    return `Virtually stage this empty ${roomType} to match the staged room shown in the provided reference images. You are viewing the same room from a different camera angle.
+
+Image 1 (the input photo) is the geometric authority. Preserve Image 1 camera viewpoint, composition, architecture, and outside view exactly.
+Use the provided master-view references as furniture/style references only. Do NOT copy reference camera angle, framing, room orientation, or wall/window layout.
+Transfer the same furniture set and relative room placement from the staged master reference into Image 1 so it reads as the same staged room from another viewpoint.
+
+Supplementary furniture details from the master view:
+${params.furnitureSpec}
+
+Maintain the ${style} design aesthetic. Preserve all architectural elements exactly as shown - walls, floors, ceilings, windows, doors, and built-in features must remain unchanged. Do not alter any surface materials, paint colors, flooring, or existing finishes. Maintain the same lighting conditions and camera angle as this input photograph.
+
+The final result should be photorealistic and suitable for professional real estate marketing.`
+  }
+
+  // Fallback: text-only spec when no visual reference is available
   return `Virtually stage this empty ${roomType} to match an existing staged view of the same space. You are viewing the same room from a different camera angle and must recreate the exact same furniture arrangement.
 
 The furniture specification from the master view:

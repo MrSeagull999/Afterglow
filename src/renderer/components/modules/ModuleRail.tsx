@@ -6,6 +6,9 @@ import {
   Sofa,
   PaintBucket,
   Lightbulb,
+  MessageSquare,
+  Wand2,
+  Cloud,
   Grid3X3,
   Settings
 } from 'lucide-react'
@@ -22,7 +25,10 @@ const MODULES: { id: ModuleType; icon: React.ReactNode; label: string; color: st
   { id: 'relight', icon: <Lightbulb className="w-5 h-5" />, label: 'ReLight', color: 'text-amber-400' },
   { id: 'clean', icon: <Eraser className="w-5 h-5" />, label: 'Clean Slate', color: 'text-emerald-400' },
   { id: 'stage', icon: <Sofa className="w-5 h-5" />, label: 'Staging', color: 'text-orange-400' },
-  { id: 'renovate', icon: <PaintBucket className="w-5 h-5" />, label: 'Renovate', color: 'text-purple-400' }
+  { id: 'renovate', icon: <PaintBucket className="w-5 h-5" />, label: 'Renovate', color: 'text-purple-400' },
+  { id: 'freeform', icon: <MessageSquare className="w-5 h-5" />, label: 'Freeform', color: 'text-cyan-400' },
+  { id: 'imagegen', icon: <Wand2 className="w-5 h-5" />, label: 'Image Gen', color: 'text-violet-400' },
+  { id: 'sky', icon: <Cloud className="w-5 h-5" />, label: 'Sky', color: 'text-sky-400' }
 ]
 
 export function ModuleRail({ activeModule, onSelectModule, onOpenLibrary, onOpenSettings }: ModuleRailProps) {

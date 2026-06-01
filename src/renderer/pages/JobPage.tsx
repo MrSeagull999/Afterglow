@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useJobStore } from '../store/useJobStore'
 import { useLibraryStore } from '../store/useLibraryStore'
 import { useModuleStore } from '../store/useModuleStore'
@@ -10,9 +10,11 @@ import { InspectorPanel } from '../inspector/InspectorPanel'
 import { LibraryHeader } from '../components/library/LibraryHeader'
 import { SourcePreviewPanel } from '../components/library/SourcePreviewPanel'
 import { ToolDock } from '../components/toolDock/ToolDock'
+import { BatchExportDialog } from '../components/export/BatchExportDialog'
 import type { ModuleType } from '../../shared/types'
 import {
   ArrowLeft,
+  Download,
   FolderOpen,
   Settings
 } from 'lucide-react'
@@ -70,6 +72,7 @@ export function JobPage() {
     currentJob,
     assets,
     selectedAssetIds,
+    versionsByAssetId,
     resetJobContext,
     loadAssetsForJob,
     getViewedVersionId,
@@ -80,9 +83,9 @@ export function JobPage() {
   } = useJobStore()
   const { loadJobStats, jobStats } = useLibraryStore()
   const {
-    activeModule, 
-    setActiveModule, 
-    loadInjectorsForModule, 
+    activeModule,
+    setActiveModule,
+    loadInjectorsForModule,
     loadGuardrailsForModule,
     setIsGenerating,
     selectedInjectorIds,
@@ -90,10 +93,31 @@ export function JobPage() {
     twilightSettings,
     stagingSettings,
     renovateSettings,
-    relightSettings
+    relightSettings,
+    freeformSettings
   } = useModuleStore()
   const { setView, addToast, openSettingsModal } = useAppStore()
-  
+  const [batchExportOpen, setBatchExportOpen] = useState(false)
+
+  // Collect all version IDs that have outputs (approved preferred, otherwise latest with output)
+  const exportableVersionIds = useMemo(() => {
+    const ids: string[] = []
+    for (const asset of assets) {
+      const versions = versionsByAssetId[asset.id] || []
+      // Prefer approved version, then latest with output
+      const approved = versions.find(v => v.lifecycleStatus === 'approved' && v.outputPath)
+      if (approved) {
+        ids.push(approved.id)
+      } else {
+        const withOutput = versions.filter(v => v.outputPath)
+        if (withOutput.length > 0) {
+          ids.push(withOutput[withOutput.length - 1].id)
+        }
+      }
+    }
+    return ids
+  }, [assets, versionsByAssetId])
+
   useEffect(() => {
     if (currentJob) {
       loadJobStats(currentJob.id)
@@ -101,10 +125,21 @@ export function JobPage() {
     }
   }, [currentJob?.id])
 
+  // Auto-reload assets when watch folder imports new images for this job
+  useEffect(() => {
+    const off = window.api.on('watchFolder:newAssets', (data: { jobId: string; count: number }) => {
+      if (currentJob && data.jobId === currentJob.id) {
+        loadAssetsForJob(currentJob.id)
+        addToast(`${data.count} new image${data.count > 1 ? 's' : ''} imported from watch folder`, 'info')
+      }
+    })
+    return off
+  }, [currentJob?.id])
+
   const applyTargetLabel = (() => {
     const count = selectedAssetIds.size
     if (count === 0) return 'Applying to: (none)'
-    if (count > 1) return 'Applying to: Latest version of each selected asset'
+    if (count > 1) return 'Applying to: Original source images'
 
     const assetId = Array.from(selectedAssetIds)[0]
     const viewed = getViewedVersionId(assetId)
@@ -161,15 +196,26 @@ export function JobPage() {
           }
         }
       } else {
-        // Multi-select: apply uses latest version of each selected asset (safe default)
         for (const assetId of assetIds) {
-          // Ensure cache is warm where possible
           await loadVersionsForAsset(currentJob.id, assetId)
-          const latest = getAssetLatestVersion(assetId)
-          if (latest?.id) {
-            sourceVersionIdByAssetId[assetId] = latest.id
-          } else if (activeModule === 'stage' || activeModule === 'renovate') {
-            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+          if (activeModule === 'stage' || activeModule === 'renovate') {
+            // For staging/renovate: source should be empty-room input.
+            // Prefer latest ready clean-slate output, else fall back to original.
+            const versions = useJobStore.getState().versionsByAssetId[assetId] || []
+            const cleanSlateVersion = versions
+              .filter(v => v.module === 'clean' && (v.status === 'hq_ready' || v.status === 'approved' || v.status === 'final_ready'))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+
+            if (cleanSlateVersion?.id) {
+              sourceVersionIdByAssetId[assetId] = cleanSlateVersion.id
+            } else {
+              sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+            }
+          } else {
+            const latest = getAssetLatestVersion(assetId)
+            if (latest?.id) {
+              sourceVersionIdByAssetId[assetId] = latest.id
+            }
           }
         }
       }
@@ -230,6 +276,13 @@ export function JobPage() {
       if (activeModule === 'clean') {
         baseParams.injectorIds = Array.from(selectedInjectorIds)
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'freeform') {
+        baseParams.craftedPrompt = freeformSettings.craftedPrompt
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        baseParams.customInstructions = freeformSettings.customInstructions
       }
 
       const results = await window.api.invoke(`module:${activeModule}:batchGenerate`, baseParams)
@@ -303,11 +356,24 @@ export function JobPage() {
       } else {
         for (const assetId of assetIds) {
           await loadVersionsForAsset(currentJob.id, assetId)
-          const latest = getAssetLatestVersion(assetId)
-          if (latest?.id) {
-            sourceVersionIdByAssetId[assetId] = latest.id
-          } else if (activeModule === 'stage' || activeModule === 'renovate') {
-            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+          if (activeModule === 'stage' || activeModule === 'renovate') {
+            // For staging/renovate: source should be empty-room input.
+            // Prefer latest ready clean-slate output, else fall back to original.
+            const versions = useJobStore.getState().versionsByAssetId[assetId] || []
+            const cleanSlateVersion = versions
+              .filter(v => v.module === 'clean' && (v.status === 'hq_ready' || v.status === 'approved' || v.status === 'final_ready'))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+
+            if (cleanSlateVersion?.id) {
+              sourceVersionIdByAssetId[assetId] = cleanSlateVersion.id
+            } else {
+              sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+            }
+          } else {
+            const latest = getAssetLatestVersion(assetId)
+            if (latest?.id) {
+              sourceVersionIdByAssetId[assetId] = latest.id
+            }
           }
         }
       }
@@ -358,6 +424,8 @@ export function JobPage() {
         baseParams.roomDimensions = stagingSettings.roomDimensions
         baseParams.injectorIds = Array.from(selectedInjectorIds)
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        baseParams.enableSceneMode = stagingSettings.enableSceneMode
+        baseParams.isMasterView = stagingSettings.isMasterView
       }
 
       if (activeModule === 'renovate') {
@@ -369,6 +437,13 @@ export function JobPage() {
       if (activeModule === 'clean') {
         baseParams.injectorIds = Array.from(selectedInjectorIds)
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'freeform') {
+        baseParams.craftedPrompt = freeformSettings.craftedPrompt
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        baseParams.customInstructions = freeformSettings.customInstructions
       }
 
       const results = await window.api.invoke(`module:${activeModule}:batchGenerateHQ`, baseParams)
@@ -409,6 +484,164 @@ export function JobPage() {
     } catch (error) {
       console.error('HQ Batch generation failed:', error)
       addToast('Failed to start HQ generation', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleApplyNative4KToSelected = async () => {
+    if (!currentJob || !activeModule || selectedAssetIds.size === 0) {
+      addToast('Select images first', 'error')
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const assetIds = Array.from(selectedAssetIds)
+
+      // Determine per-asset source version mapping
+      const sourceVersionIdByAssetId: Record<string, string> = {}
+      if (assetIds.length === 1) {
+        const assetId = assetIds[0]
+        const viewed = getViewedVersionId(assetId)
+        if (viewed) {
+          sourceVersionIdByAssetId[assetId] = viewed
+        } else {
+          if (activeModule === 'stage' || activeModule === 'renovate') {
+            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+          }
+        }
+      } else {
+        for (const assetId of assetIds) {
+          await loadVersionsForAsset(currentJob.id, assetId)
+          if (activeModule === 'stage' || activeModule === 'renovate') {
+            // For staging/renovate: source should be empty-room input.
+            // Prefer latest ready clean-slate output, else fall back to original.
+            const versions = useJobStore.getState().versionsByAssetId[assetId] || []
+            const cleanSlateVersion = versions
+              .filter(v => v.module === 'clean' && (v.status === 'hq_ready' || v.status === 'approved' || v.status === 'final_ready'))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+
+            if (cleanSlateVersion?.id) {
+              sourceVersionIdByAssetId[assetId] = cleanSlateVersion.id
+            } else {
+              sourceVersionIdByAssetId[assetId] = `original:${assetId}`
+            }
+          } else {
+            const latest = getAssetLatestVersion(assetId)
+            if (latest?.id) {
+              sourceVersionIdByAssetId[assetId] = latest.id
+            }
+          }
+        }
+      }
+
+      const baseParams: any = {
+        jobId: currentJob.id,
+        assetIds,
+        sourceVersionIdByAssetId,
+        qualityTier: 'native_4k'  // Signal Native 4K generation
+      }
+
+      if (activeModule === 'twilight') {
+        const presets = await window.electronAPI.getPresets()
+        const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
+        baseParams.presetId = twilightSettings.presetId
+        baseParams.promptTemplate = preset?.promptTemplate || ''
+        baseParams.lightingCondition = twilightSettings.lightingCondition
+        baseParams.customInstructions = twilightSettings.customInstructions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (twilightSettings.referenceImageId) {
+          const refImage = await window.electronAPI.getReferenceImage('twilight', twilightSettings.referenceImageId)
+          if (refImage?.imagePath) {
+            baseParams.referenceImagePath = refImage.imagePath
+          }
+        }
+      }
+
+      if (activeModule === 'relight') {
+        const presets = await window.electronAPI.getRelightPresets()
+        const preset = presets.find((p: any) => p.id === relightSettings.presetId)
+        baseParams.presetId = relightSettings.presetId
+        baseParams.promptTemplate = preset?.promptTemplate || ''
+        baseParams.customInstructions = relightSettings.customInstructions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (relightSettings.referenceImageId) {
+          const refImage = await window.electronAPI.getReferenceImage('relight', relightSettings.referenceImageId)
+          if (refImage?.imagePath) {
+            baseParams.referenceImagePath = refImage.imagePath
+          }
+        }
+      }
+
+      if (activeModule === 'stage') {
+        baseParams.roomType = stagingSettings.roomType
+        baseParams.style = stagingSettings.style
+        baseParams.roomDimensions = stagingSettings.roomDimensions
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        baseParams.enableSceneMode = stagingSettings.enableSceneMode
+        baseParams.isMasterView = stagingSettings.isMasterView
+      }
+
+      if (activeModule === 'renovate') {
+        baseParams.changes = renovateSettings.changes
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'clean') {
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+      }
+
+      if (activeModule === 'freeform') {
+        baseParams.craftedPrompt = freeformSettings.craftedPrompt
+        baseParams.injectorIds = Array.from(selectedInjectorIds)
+        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        baseParams.customInstructions = freeformSettings.customInstructions
+      }
+
+      const results = await window.api.invoke(`module:${activeModule}:batchGenerateNative4K`, baseParams)
+
+      const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
+
+      for (const assetId of assetIds) {
+        const createdId = createdVersionIdsByAssetId[assetId]
+        if (!createdId) continue
+        const sourceId = sourceVersionIdByAssetId[assetId]
+        const sourceVersionIds = sourceId ? [sourceId] : []
+        const pending = useJobStore.getState().createOptimisticPendingVersion({
+          jobId: currentJob.id,
+          assetId,
+          versionId: createdId,
+          module: activeModule,
+          sourceVersionIds
+        })
+        useJobStore.getState().upsertVersionForAsset(assetId, pending)
+        setViewedVersionId(assetId, createdId)
+      }
+
+      useJobStore.getState().startBatchRun({
+        moduleId: activeModule,
+        assetIds,
+        createdVersionIdsByAssetId,
+        failedAssetIds
+      })
+
+      applyBatchGenerationResults({
+        assetIds,
+        results,
+        setLastAppliedVersionId,
+        setViewedVersionId
+      })
+
+      addToast(`Started Native 4K ${activeModule} generation for ${assetIds.length} images`, 'success')
+    } catch (error) {
+      console.error('Native 4K Batch generation failed:', error)
+      addToast('Failed to start Native 4K generation', 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -458,6 +691,16 @@ export function JobPage() {
         )}
 
         <button
+          onClick={() => setBatchExportOpen(true)}
+          disabled={exportableVersionIds.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-slate-300"
+          title={`Export ${exportableVersionIds.length} images`}
+        >
+          <Download className="w-4 h-4" />
+          Export ({exportableVersionIds.length})
+        </button>
+
+        <button
           onClick={handleShowJobInFinder}
           className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
           title="Show job folder in Finder"
@@ -503,8 +746,16 @@ export function JobPage() {
             applyTargetLabel={applyTargetLabel}
             onApply={handleApplyToSelected}
             onApplyHQ={handleApplyHQToSelected}
+            onApplyNative4K={handleApplyNative4KToSelected}
           />
         }
+      />
+
+      <BatchExportDialog
+        open={batchExportOpen}
+        onClose={() => setBatchExportOpen(false)}
+        jobId={currentJob.id}
+        versionIds={exportableVersionIds}
       />
     </div>
   )

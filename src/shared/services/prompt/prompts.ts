@@ -177,6 +177,48 @@ OUTPUT QUALITY:
 - ONLY add elements that are explicitly specified in additional instructions below.`
 }
 
+/**
+ * Simplified staging prompt (~300 words vs ~1500 in full mode).
+ * Consolidates guardrails into the base prompt and removes:
+ * - Scale reference table (model can't do the spatial math)
+ * - Mirror placement rules (rare edge case, adds noise)
+ * - Reflective surface guidelines (same)
+ * - Redundant preservation rules (said 3x in full mode)
+ * - Detailed furniture positioning guidance (only relevant for edit mode)
+ */
+export function buildStagingBasePromptSimplified(params: StagingPromptParams): string {
+  const { roomType, style, roomDimensions } = params
+
+  // Build concise dimensions note if provided
+  let dimensionsNote = ''
+  if (roomDimensions?.enabled) {
+    const unit = roomDimensions.unit === 'meters' ? 'm' : 'ft'
+    const parts: string[] = []
+    if (roomDimensions.backWall) parts.push(`back wall ~${roomDimensions.backWall}${unit} wide`)
+    if (roomDimensions.leftWall) parts.push(`left wall ~${roomDimensions.leftWall}${unit} deep`)
+    if (roomDimensions.rightWall) parts.push(`right wall ~${roomDimensions.rightWall}${unit} deep`)
+    if (roomDimensions.ceilingHeight) parts.push(`ceiling ~${roomDimensions.ceilingHeight}${unit}`)
+    if (parts.length > 0) {
+      dimensionsNote = `\nRoom dimensions: ${parts.join(', ')}. Scale furniture realistically to these dimensions.`
+    } else if (roomDimensions.width && roomDimensions.length) {
+      dimensionsNote = `\nRoom is approximately ${roomDimensions.width} × ${roomDimensions.length} ${roomDimensions.unit === 'meters' ? 'meters' : 'feet'}.`
+    }
+  }
+
+  // Get room-specific constraint
+  const furnitureConstraint = ROOM_FURNITURE_CONSTRAINTS[roomType] || ''
+  const constraintNote = furnitureConstraint ? ` ${furnitureConstraint}` : ''
+
+  return `Virtually stage this empty ${roomType} with realistic furniture in a ${style} style.${dimensionsNote}${constraintNote}
+
+RULES:
+- Preserve all architecture, surfaces, fixtures, camera angle, and lighting exactly as shown.
+- Furniture must be realistically scaled to the room - do not miniaturize. If standard furniture makes the room look full, that is correct. Use fewer or smaller appropriate pieces instead.
+- All items must be properly grounded with natural shadows.
+- Do not add window treatments, artwork, plants, or accessories unless specified below.
+- Result must be photorealistic, suitable for professional real estate marketing.`
+}
+
 export function buildTwilightPreviewBasePrompt(
   presetPromptTemplate: string,
   lightingCondition?: 'overcast' | 'sunny'

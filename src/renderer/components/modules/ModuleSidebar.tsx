@@ -7,6 +7,9 @@ import { StagingPanel } from './StagingPanel'
 import { RenovatePanel } from './RenovatePanel'
 import { TwilightPanel } from './TwilightPanel'
 import { RelightPanel } from './RelightPanel'
+import { FreeformPanel } from './FreeformPanel'
+import { ImageGenPanel } from './ImageGenPanel'
+import { SkyPanel } from './SkyPanel'
 import { ModuleInputPicker } from './ModuleInputPicker'
 import {
   Sparkles,
@@ -15,6 +18,9 @@ import {
   PaintBucket,
   Moon,
   Lightbulb,
+  MessageSquare,
+  Wand2,
+  Cloud,
   ChevronRight
 } from 'lucide-react'
 
@@ -48,6 +54,24 @@ const MODULES: { id: ModuleType; label: string; icon: React.ReactNode; descripti
     label: 'Renovate',
     icon: <PaintBucket className="w-5 h-5" />,
     description: 'Change surfaces & finishes'
+  },
+  {
+    id: 'freeform',
+    label: 'Freeform',
+    icon: <MessageSquare className="w-5 h-5" />,
+    description: 'AI-assisted custom editing'
+  },
+  {
+    id: 'imagegen',
+    label: 'Image Gen',
+    icon: <Wand2 className="w-5 h-5" />,
+    description: 'Generate images from a text prompt'
+  },
+  {
+    id: 'sky',
+    label: 'Sky',
+    icon: <Cloud className="w-5 h-5" />,
+    description: 'Generate full-frame sky images for compositing'
   }
 ]
 
@@ -133,13 +157,15 @@ export function ModuleSidebar() {
             </h3>
           </div>
 
-          {/* Input Picker - at top of all module settings */}
-          <div className="flex-shrink-0 p-3 border-b border-slate-700">
-            <ModuleInputPicker
-              selectedInput={selectedInput}
-              onSelectInput={setSelectedInput}
-            />
-          </div>
+          {/* Input Picker — hidden for imagegen and sky (no source asset needed) */}
+          {activeModule !== 'imagegen' && activeModule !== 'sky' && (
+            <div className="flex-shrink-0 p-3 border-b border-slate-700">
+              <ModuleInputPicker
+                selectedInput={selectedInput}
+                onSelectInput={setSelectedInput}
+              />
+            </div>
+          )}
 
           {/* Module Panel */}
           <div className="flex-1 overflow-y-auto scrollbar-thin">
@@ -148,6 +174,9 @@ export function ModuleSidebar() {
             {activeModule === 'renovate' && <RenovatePanel />}
             {activeModule === 'twilight' && <TwilightPanel />}
             {activeModule === 'relight' && <RelightPanel />}
+            {activeModule === 'freeform' && <FreeformPanel />}
+            {activeModule === 'imagegen' && <ImageGenPanel />}
+            {activeModule === 'sky' && <SkyPanel />}
           </div>
         </div>
       )}

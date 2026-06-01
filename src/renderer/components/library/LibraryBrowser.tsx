@@ -21,6 +21,8 @@ import {
   PaintBucket,
   Moon,
   Lightbulb,
+  MessageSquare,
+  Wand2,
   Eye,
   EyeOff
 } from 'lucide-react'
@@ -47,7 +49,9 @@ const MODULE_ICONS: Record<ModuleType, React.ReactNode> = {
   stage: <Sofa className="w-4 h-4" />,
   renovate: <PaintBucket className="w-4 h-4" />,
   twilight: <Moon className="w-4 h-4" />,
-  relight: <Lightbulb className="w-4 h-4" />
+  relight: <Lightbulb className="w-4 h-4" />,
+  freeform: <MessageSquare className="w-4 h-4" />,
+  imagegen: <Wand2 className="w-4 h-4" />
 }
 
 type ViewMode = 'assets' | 'versions'

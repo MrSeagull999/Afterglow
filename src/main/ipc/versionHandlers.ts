@@ -1,7 +1,8 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { VersionStatus, ModuleType, VersionRecipe } from '../../shared/types'
 import { generateVersionHQPreview, generateVersionPreview } from '../core/modules/shared/generateService'
 import { exportVersion } from '../export/exportVersion'
+import { batchExport, type BatchExportFormat } from '../export/batchExport'
 import {
   createVersion,
   createHQRegenVersion,
@@ -101,6 +102,54 @@ export function registerVersionHandlers(): void {
     generateVersionPreview(params.jobId, version.id, (progress) => {
       sendProgress(version.id, progress)
     }).catch((err) => console.error('[Version Retry] Generation error:', err))
+
+    return version
+  })
+
+  ipcMain.handle('export:batch', async (_event, params: {
+    jobId: string
+    versionIds: string[]
+    format: BatchExportFormat
+    maxWidth?: number
+    jpegQuality?: number
+  }) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose export folder'
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+
+    return batchExport({
+      ...params,
+      outputFolder: result.filePaths[0]
+    })
+  })
+
+  ipcMain.handle('version:acceptEvaluation', async (_event, jobId: string, versionId: string) => {
+    return updateVersion(jobId, versionId, { evaluationFlag: 'accepted' })
+  })
+
+  ipcMain.handle('version:regenerateFromEvaluation', async (_event, jobId: string, versionId: string) => {
+    const base = await getVersion(jobId, versionId)
+    if (!base) return null
+
+    const version = await createVersion({
+      jobId,
+      assetId: base.assetId,
+      module: base.module,
+      qualityTier: base.qualityTier,
+      recipe: base.recipe,
+      sourceVersionIds: [base.id],
+      seed: null, // New seed for different result
+      model: base.model
+    })
+
+    // Mark original as regenerated
+    await updateVersion(jobId, versionId, { evaluationFlag: 'regenerated' })
+
+    generateVersionPreview(jobId, version.id, (progress) => {
+      sendProgress(version.id, progress)
+    }).catch((err) => console.error('[Eval Regenerate] Generation error:', err))
 
     return version
   })

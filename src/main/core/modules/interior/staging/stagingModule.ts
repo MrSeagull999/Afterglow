@@ -14,8 +14,9 @@ import {
 import { buildGuardrailPrompt, getDefaultGuardrailIds } from '../../shared/guardrails'
 import { buildInjectorPromptFromIds } from '../../shared/injectorRegistry'
 import { buildSecondaryAnglePrompt } from './stagingPrompts'
-import { buildStagingBasePrompt } from '../../../../../shared/services/prompt/prompts'
+import { buildStagingBasePrompt, buildStagingBasePromptSimplified } from '../../../../../shared/services/prompt/prompts'
 import { PromptAssembler } from '../../../services/prompt/promptAssembler'
+import { getSettings } from '../../../settings'
 
 export interface StagingParams {
   jobId: string
@@ -64,18 +65,25 @@ export async function generateStagingPreview(params: StagingParams): Promise<Ver
     sourceVersionIds = [params.sourceVersionId]
   }
 
-  const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
-  const injectorIds = params.injectorIds || []
+  const settings = await getSettings()
+  const useSimplified = settings.promptStyle === 'simplified'
 
-  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
+  const injectorIds = params.injectorIds || []
   const injectorPrompt = await buildInjectorPromptFromIds('stage', injectorIds)
   const injectorPrompts = injectorPrompt ? [injectorPrompt] : []
 
-  const basePrompt = buildStagingBasePrompt({
+  // In simplified mode, guardrails are baked into the base prompt
+  const guardrailIds = useSimplified ? [] : (params.customGuardrails || getDefaultGuardrailIds('stage'))
+  const guardrailPrompts = guardrailIds.map(id => buildGuardrailPrompt([id])).filter(Boolean)
+
+  const promptParams = {
     roomType: params.roomType || 'room',
     style: params.style || 'modern contemporary',
     roomDimensions: params.roomDimensions
-  })
+  }
+  const basePrompt = useSimplified
+    ? buildStagingBasePromptSimplified(promptParams)
+    : buildStagingBasePrompt(promptParams)
 
   const assembled = await PromptAssembler.assemble({
     module: 'stage',
@@ -133,14 +141,36 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
     throw new Error(`Asset not found: ${params.assetId}`)
   }
 
-  const sourceVersion = await getVersion(params.jobId, params.sourceVersionId)
-  if (!sourceVersion?.outputPath) {
-    throw new Error(`Source version not found or has no output: ${params.sourceVersionId}`)
+  // Support original image as source for secondary angles, same as primary staging flow.
+  let inputPath: string
+  let sourceVersionIds: string[] = []
+  if (params.sourceVersionId.startsWith('original:')) {
+    inputPath = asset.originalPath
+  } else {
+    const sourceVersion = await getVersion(params.jobId, params.sourceVersionId)
+    if (!sourceVersion?.outputPath) {
+      throw new Error(`Source version not found or has no output: ${params.sourceVersionId}`)
+    }
+    inputPath = sourceVersion.outputPath
+    sourceVersionIds = [params.sourceVersionId]
   }
 
   const masterVersion = await getVersion(params.jobId, params.masterVersionId)
   if (!masterVersion?.outputPath) {
     throw new Error(`Master version not found or has no output: ${params.masterVersionId}`)
+  }
+
+  // Resolve master "before" path for a before/after reference pair.
+  let masterInputPath = masterVersion.recipe?.settings?.inputPath as string | undefined
+  if (!masterInputPath && masterVersion.sourceVersionIds.length > 0) {
+    const masterSourceVersion = await getVersion(params.jobId, masterVersion.sourceVersionIds[0])
+    if (masterSourceVersion?.outputPath) {
+      masterInputPath = masterSourceVersion.outputPath
+    }
+  }
+  if (!masterInputPath) {
+    const masterAsset = await getAsset(params.jobId, masterVersion.assetId)
+    masterInputPath = masterAsset?.originalPath
   }
 
   const guardrailIds = params.customGuardrails || getDefaultGuardrailIds('stage')
@@ -153,7 +183,8 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
   const basePrompt = buildSecondaryAnglePrompt({
     furnitureSpec: params.furnitureSpec.description,
     roomType: params.roomType,
-    style: params.style
+    style: params.style,
+    hasVisualReference: !!masterVersion.outputPath
   })
 
   const assembled = await PromptAssembler.assemble({
@@ -173,7 +204,7 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
     injectors: injectorIds,
     guardrails: guardrailIds,
     settings: {
-      inputPath: sourceVersion.outputPath,
+      inputPath,
       masterVersionId: params.masterVersionId,
       furnitureSpecId: params.furnitureSpec.id,
       roomType: params.roomType,
@@ -181,7 +212,21 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
       customInstructions: params.customInstructions,
       injectorPrompts,
       guardrailPrompts,
-      fullPrompt
+      fullPrompt,
+      // Backward-compatible single-reference fields
+      referenceImagePath: masterVersion.outputPath,
+      referenceImageRole: 'furniture-only reference from the same room staged at a different angle. Match furniture identity/style/materials/colors only. Preserve Image 1 camera viewpoint and geometry; do not copy reference composition or framing.',
+      // Preferred multi-reference payload: master before + master after
+      referenceImages: [
+        {
+          path: masterInputPath,
+          role: 'master view BEFORE staging (empty/source). Use with the staged master to infer what furniture/decor was added and where.'
+        },
+        {
+          path: masterVersion.outputPath,
+          role: 'master view AFTER staging. Match this furniture set and relative placement, but keep Image 1 camera/viewpoint.'
+        }
+      ]
     }
   }
 
@@ -190,7 +235,9 @@ export async function generateSecondaryAnglePreview(params: MultiAngleStagingPar
     assetId: params.assetId,
     module: 'stage',
     recipe,
-    sourceVersionIds: [params.sourceVersionId, params.masterVersionId],
+    // Keep sourceVersionIds focused on the asset's actual input source.
+    // masterVersionId is stored in recipe.settings for reference-image usage.
+    sourceVersionIds,
     seed: params.seed,
     model: params.model
   })

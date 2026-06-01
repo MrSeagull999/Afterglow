@@ -6,6 +6,8 @@ import { CleanSlateSettings } from '../components/modules/settings/CleanSlateSet
 import { StagingSettings } from '../components/modules/settings/StagingSettings'
 import { RenovateSettings } from '../components/modules/settings/RenovateSettings'
 import { RelightSettings } from '../components/modules/settings/RelightSettings'
+import { FreeformPanel } from '../components/modules/FreeformPanel'
+import { SkyPanel } from '../components/modules/SkyPanel'
 import { resolveGenerationStatus } from '../../shared/resolveGenerationStatus'
 import { useInspectorTruth } from './useInspectorTruth'
 import { useJobStore } from '../store/useJobStore'
@@ -19,6 +21,7 @@ export interface InspectorPanelProps {
   applyTargetLabel?: string
   onApply: () => void
   onApplyHQ?: () => void
+  onApplyNative4K?: () => void
   isApplyingDisabled?: boolean
 }
 
@@ -117,7 +120,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
     currentJob &&
     viewedVersion &&
     selectionCount === 1 &&
-    viewedVersion.status === 'approved'
+    (viewedVersion.status === 'approved' || viewedVersion.status === 'hq_ready')
   )
 
   const selectionSummary = useMemo(() => {
@@ -305,6 +308,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
         />
 
         {/* 3) Provider Truth */}
+        {props.activeModule !== 'freeform' && props.activeModule !== 'sky' && (
         <section data-testid="section-provider" className="p-4 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 space-y-2 min-w-0">
           <div className="text-[11px] tracking-wide text-slate-200 font-semibold">PROVIDER TRUTH</div>
           <div className="flex items-start gap-2 min-w-0" data-testid="provider-row">
@@ -325,6 +329,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
             </div>
           )}
         </section>
+        )}
 
         {generationError && (
           <section data-testid="section-generation-error" className="p-4 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 space-y-2 min-w-0">
@@ -357,6 +362,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
         )}
 
         {/* 4) Prompt Truth */}
+        {props.activeModule !== 'freeform' && props.activeModule !== 'sky' && (
         <section
           data-testid="section-prompt"
           className={`p-4 bg-slate-900 border border-slate-700 rounded-lg space-y-2 min-w-0 ${isPromptExpanded ? 'flex flex-col min-h-[22rem]' : ''}`}
@@ -396,8 +402,10 @@ export function InspectorPanel(props: InspectorPanelProps) {
             />
           </div>
         </section>
+        )}
 
         {/* 5) Extra Instructions */}
+        {props.activeModule !== 'freeform' && props.activeModule !== 'sky' && (
         <section data-testid="section-extra" className="p-4 bg-slate-900 border border-slate-700 rounded-lg space-y-2 min-w-0">
           <div className="text-[11px] tracking-wide text-slate-200 font-semibold">EXTRA INSTRUCTIONS</div>
           <textarea
@@ -407,6 +415,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
             className="w-full h-24 min-h-[5rem] max-h-[16rem] px-3 py-2 text-sm bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 resize-y focus:outline-none focus:border-blue-500"
           />
         </section>
+        )}
 
         {/* 6) Module Controls */}
         <section data-testid="section-module" className="p-4 bg-slate-900 border border-slate-700 rounded-lg space-y-3 min-w-0">
@@ -420,6 +429,13 @@ export function InspectorPanel(props: InspectorPanelProps) {
               {props.activeModule === 'clean' && <CleanSlateSettings />}
               {props.activeModule === 'stage' && <StagingSettings />}
               {props.activeModule === 'renovate' && <RenovateSettings />}
+              {props.activeModule === 'freeform' && (
+                <FreeformPanel
+                  assetId={props.selectedAssetIds[0]}
+                  jobId={currentJob?.id}
+                />
+              )}
+              {props.activeModule === 'sky' && <SkyPanel />}
             </div>
           )}
         </section>
@@ -434,15 +450,15 @@ export function InspectorPanel(props: InspectorPanelProps) {
         </section>
       </div>
 
-      {/* 7) Primary Action */}
-      <div data-testid="section-primary-action" className="flex-shrink-0 p-4 border-t border-slate-700 bg-slate-800/80">
+      {/* 7) Primary Action — hidden for Sky (has its own Generate button in SkyPanel) */}
+      {props.activeModule !== 'sky' && <div data-testid="section-primary-action" className="flex-shrink-0 p-4 border-t border-slate-700 bg-slate-800/80">
         {props.applyTargetLabel && (
           <div className="text-xs text-slate-400 mb-2" data-testid="apply-target-label">
             {props.applyTargetLabel}
           </div>
         )}
 
-        {/* Generation Buttons - Preview and HQ Preview */}
+        {/* Generation Buttons - Preview, HQ Preview, and Native 4K */}
         <div className="flex gap-2 mb-3">
           <button
             type="button"
@@ -464,6 +480,17 @@ export function InspectorPanel(props: InspectorPanelProps) {
           >
             <div className="text-sm font-medium">HQ Preview (2K)</div>
             <div className="text-xs text-purple-200">~$0.13</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={props.onApplyNative4K}
+            disabled={isApplyDisabled || !props.onApplyNative4K}
+            className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
+            title="Generate true 4K version (3840×2160) directly - skip preview if you trust your prompt"
+          >
+            <div className="text-sm font-medium">Native 4K</div>
+            <div className="text-xs text-amber-200">~$0.24</div>
           </button>
         </div>
 
@@ -509,7 +536,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
     </aside>
   )
 }

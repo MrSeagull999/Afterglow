@@ -55,6 +55,7 @@ interface ModuleState {
     sourceVersionId: string | null
     roomType: string
     style: string
+    enableSceneMode: boolean
     isMasterView: boolean
     masterVersionId: string | null
     furnitureSpecId: string | null
@@ -93,6 +94,12 @@ interface ModuleState {
     referenceImageId: string | null
   }
 
+  freeformSettings: {
+    sourceVersionId: string | null
+    craftedPrompt: string
+    customInstructions: string
+  }
+
   // Generation state
   isGenerating: boolean
   generatingVersionId: string | null
@@ -123,6 +130,7 @@ interface ModuleState {
   setStagingSourceVersion: (versionId: string | null) => void
   setStagingRoomType: (roomType: string) => void
   setStagingStyle: (style: string) => void
+  setStagingEnableSceneMode: (enabled: boolean) => void
   setStagingIsMasterView: (isMaster: boolean) => void
   setStagingMasterVersion: (versionId: string | null) => void
   setStagingFurnitureSpec: (specId: string | null) => void
@@ -146,6 +154,11 @@ interface ModuleState {
   setRelightPresetId: (presetId: string) => void
   setRelightCustomInstructions: (instructions: string) => void
   setRelightReferenceImage: (referenceImageId: string | null) => void
+
+  // Freeform
+  setFreeformSourceVersion: (versionId: string | null) => void
+  setFreeformCraftedPrompt: (prompt: string) => void
+  setFreeformCustomInstructions: (instructions: string) => void
 
   // Generation
   setIsGenerating: (isGenerating: boolean) => void
@@ -192,6 +205,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
     sourceVersionId: null,
     roomType: 'living room',
     style: 'modern contemporary',
+    enableSceneMode: false,
     isMasterView: true,
     masterVersionId: null,
     furnitureSpecId: null,
@@ -227,6 +241,12 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
     presetId: 'relight_blue_hour',
     customInstructions: '',
     referenceImageId: null
+  },
+
+  freeformSettings: {
+    sourceVersionId: null,
+    craftedPrompt: '',
+    customInstructions: ''
   },
 
   isGenerating: false,
@@ -320,6 +340,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       stagingSettings: { ...state.stagingSettings, style }
     })),
 
+  setStagingEnableSceneMode: (enabled) =>
+    set((state) => ({
+      stagingSettings: { ...state.stagingSettings, enableSceneMode: enabled }
+    })),
+
   setStagingIsMasterView: (isMaster) =>
     set((state) => ({
       stagingSettings: { ...state.stagingSettings, isMasterView: isMaster }
@@ -411,6 +436,22 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
       relightSettings: { ...state.relightSettings, referenceImageId }
     })),
 
+  // Freeform
+  setFreeformSourceVersion: (versionId) =>
+    set((state) => ({
+      freeformSettings: { ...state.freeformSettings, sourceVersionId: versionId }
+    })),
+
+  setFreeformCraftedPrompt: (prompt) =>
+    set((state) => ({
+      freeformSettings: { ...state.freeformSettings, craftedPrompt: prompt }
+    })),
+
+  setFreeformCustomInstructions: (instructions) =>
+    set((state) => ({
+      freeformSettings: { ...state.freeformSettings, customInstructions: instructions }
+    })),
+
   // Generation
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setGeneratingVersionId: (versionId) => set({ generatingVersionId: versionId }),
@@ -444,6 +485,7 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         sourceVersionId: null,
         roomType: 'living room',
         style: 'modern contemporary',
+        enableSceneMode: false,
         isMasterView: true,
         masterVersionId: null,
         furnitureSpecId: null,
@@ -476,6 +518,11 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
         presetId: 'relight_blue_hour',
         customInstructions: '',
         referenceImageId: null
+      },
+      freeformSettings: {
+        sourceVersionId: null,
+        craftedPrompt: '',
+        customInstructions: ''
       },
       isGenerating: false,
       generatingVersionId: null

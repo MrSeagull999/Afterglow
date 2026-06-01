@@ -3,6 +3,7 @@ import { useAppStore, PreviewModel, SeedStrategy } from '../store/useAppStore'
 import { X, Info } from 'lucide-react'
 import { ProviderSettings } from './settings/ProviderSettings'
 import { ReferenceImageSettings } from './settings/ReferenceImageSettings'
+import { WatchFolderSettings } from './settings/WatchFolderSettings'
 
 export function SettingsModal() {
   const { settingsModalOpen, closeSettingsModal, settings, setSettings, addToast } = useAppStore()
@@ -194,6 +195,11 @@ export function SettingsModal() {
           <div className="border-t border-slate-700 pt-4 space-y-4">
             <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">Reference Images</h3>
             <ReferenceImageSettings />
+          </div>
+
+          <div className="border-t border-slate-700 pt-4 space-y-4">
+            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">Watch Folder</h3>
+            <WatchFolderSettings />
           </div>
         </div>
 

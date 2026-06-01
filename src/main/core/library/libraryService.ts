@@ -133,7 +133,10 @@ export async function getJobStats(jobId: string): Promise<{
     twilight: 0,
     clean: 0,
     stage: 0,
-    renovate: 0
+    renovate: 0,
+    relight: 0,
+    freeform: 0,
+    imagegen: 0
   }
 
   let approvedCount = 0

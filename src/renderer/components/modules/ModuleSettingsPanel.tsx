@@ -9,6 +9,9 @@ import {
   Sofa,
   PaintBucket,
   Lightbulb,
+  MessageSquare,
+  Wand2,
+  Cloud,
   ChevronLeft,
   Sparkles,
   Loader2,
@@ -70,6 +73,27 @@ const MODULE_CONFIG: Record<ModuleType, {
     color: 'text-amber-400',
     bgColor: 'bg-amber-600',
     description: 'Enhance existing photos with improved lighting conditions - fix overcast skies, correct color temperature, or transform flat twilight shots.'
+  },
+  freeform: {
+    label: 'Freeform',
+    icon: <MessageSquare className="w-5 h-5" />,
+    color: 'text-cyan-400',
+    bgColor: 'bg-cyan-600',
+    description: 'AI-assisted custom editing with a freeform prompt.'
+  },
+  imagegen: {
+    label: 'Image Gen',
+    icon: <Wand2 className="w-5 h-5" />,
+    color: 'text-violet-400',
+    bgColor: 'bg-violet-600',
+    description: 'Generate images from a text prompt — no source photo needed.'
+  },
+  sky: {
+    label: 'Sky',
+    icon: <Cloud className="w-5 h-5" />,
+    color: 'text-sky-400',
+    bgColor: 'bg-sky-600',
+    description: 'Generate photorealistic full-frame sky images for Photoshop compositing.'
   }
 }
 

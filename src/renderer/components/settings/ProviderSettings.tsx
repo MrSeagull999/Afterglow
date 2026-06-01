@@ -133,6 +133,43 @@ export function ProviderSettings() {
         </p>
       </div>
 
+      {/* Prompt Style */}
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Prompt Style
+        </label>
+        <div className="space-y-2">
+          <label className="flex items-center gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-800/50">
+            <input
+              type="radio"
+              name="promptStyle"
+              value="full"
+              checked={(settings.promptStyle || 'full') === 'full'}
+              onChange={() => setSettings({ ...settings, promptStyle: 'full' })}
+              className="w-4 h-4 text-blue-500"
+            />
+            <div>
+              <div className="text-white font-medium">Full Prompts</div>
+              <div className="text-xs text-slate-400">Detailed prompts with all guardrails (~1500 words for staging)</div>
+            </div>
+          </label>
+          <label className="flex items-center gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-800/50">
+            <input
+              type="radio"
+              name="promptStyle"
+              value="simplified"
+              checked={settings.promptStyle === 'simplified'}
+              onChange={() => setSettings({ ...settings, promptStyle: 'simplified' })}
+              className="w-4 h-4 text-blue-500"
+            />
+            <div>
+              <div className="text-white font-medium">Simplified Prompts</div>
+              <div className="text-xs text-slate-400">Concise prompts with consolidated rules (~300 words). May improve consistency by reducing prompt complexity.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       {/* Priority Mode (OpenRouter only) */}
       {settings.imageProvider === 'openrouter' && (
         <div>
@@ -154,6 +191,60 @@ export function ProviderSettings() {
           </label>
         </div>
       )}
+
+      {/* Auto-Evaluation */}
+      <div className="border-t border-slate-700 pt-6">
+        <h3 className="text-sm font-medium text-slate-300 mb-3">Auto-Evaluation</h3>
+        <label className="flex items-start gap-3 p-3 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-800/50">
+          <input
+            type="checkbox"
+            checked={settings.evaluationEnabled ?? false}
+            onChange={(e) => setSettings({ ...settings, evaluationEnabled: e.target.checked })}
+            className="w-4 h-4 mt-0.5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+          />
+          <div>
+            <div className="text-sm font-medium text-white">Score generated images automatically</div>
+            <div className="text-xs text-slate-400 mt-1">
+              Uses Gemini Flash to evaluate each output on scale, realism, and preservation. Low-scoring results are automatically retried. Adds ~$0.001 per evaluation.
+            </div>
+          </div>
+        </label>
+
+        {settings.evaluationEnabled && (
+          <div className="mt-3 space-y-3 pl-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                Minimum quality score (1-10)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                step={1}
+                value={settings.evaluationThreshold ?? 7}
+                onChange={(e) => setSettings({ ...settings, evaluationThreshold: parseInt(e.target.value) || 7 })}
+                className="w-20 px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+              />
+              <span className="text-xs text-slate-500 ml-2">Below this score, generation is retried with a new seed</span>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                Max retries per image
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={3}
+                step={1}
+                value={settings.evaluationMaxRetries ?? 1}
+                onChange={(e) => setSettings({ ...settings, evaluationMaxRetries: parseInt(e.target.value) || 1 })}
+                className="w-20 px-2 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-blue-500"
+              />
+              <span className="text-xs text-slate-500 ml-2">0 = evaluate only (no retry), 1-3 = retry with new seed</span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Privacy Settings */}
       <div className="border-t border-slate-700 pt-6">

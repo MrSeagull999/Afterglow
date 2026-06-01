@@ -33,3 +33,6 @@ jobs/
 # Temporary files
 *.tmp
 *.temp
+
+# macOS resource forks (created during HDD recovery)
+._*

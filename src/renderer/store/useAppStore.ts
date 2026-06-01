@@ -80,6 +80,15 @@ export interface Settings {
   previewImageModel?: string
   previewPriorityMode?: boolean
   advancedCustomModel?: string
+
+  // Prompt style: 'full' uses detailed prompts, 'simplified' uses concise prompts
+  promptStyle?: 'full' | 'simplified'
+
+  // Auto-evaluation
+  evaluationEnabled?: boolean
+  evaluationThreshold?: number
+  evaluationMaxRetries?: number
+
   privacy?: {
     safeFilenamesOnImport: boolean
   }

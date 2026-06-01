@@ -116,6 +116,16 @@ const api = {
     const handler = (_: any, data: { versionId: string; progress: number }) => callback(data)
     ipcRenderer.on('version:progress', handler)
     return () => ipcRenderer.removeListener('version:progress', handler)
+  },
+  onAgentBatchStatus: (callback: (data: any) => void) => {
+    const handler = (_: any, data: any) => callback(data)
+    ipcRenderer.on('agentBatch:status', handler)
+    return () => ipcRenderer.removeListener('agentBatch:status', handler)
+  },
+  onAgentBatchComplete: (callback: (data: { batchId: string; done: number; flagged: number; errors: number }) => void) => {
+    const handler = (_: any, data: any) => callback(data)
+    ipcRenderer.on('agentBatch:complete', handler)
+    return () => ipcRenderer.removeListener('agentBatch:complete', handler)
   }
 }
 
@@ -128,6 +138,8 @@ declare global {
       invoke: (channel: string, ...args: any[]) => Promise<any>
       on: (channel: string, callback: (...args: any[]) => void) => () => void
       onVersionProgress: (callback: (data: { versionId: string; progress: number }) => void) => () => void
+      onAgentBatchStatus: (callback: (data: any) => void) => () => void
+      onAgentBatchComplete: (callback: (data: { batchId: string; done: number; flagged: number; errors: number }) => void) => () => void
     }
   }
 }

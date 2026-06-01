@@ -6,6 +6,7 @@ import {
   buildCleanSlateBasePrompt,
   buildRenovateBasePrompt,
   buildStagingBasePrompt,
+  buildStagingBasePromptSimplified,
   buildTwilightPreviewBasePrompt
 } from '../../shared/services/prompt/prompts'
 import { useModuleStore } from '../store/useModuleStore'
@@ -41,7 +42,9 @@ export function useInspectorTruth(params: {
     renovateSettings,
     setRenovateCustomInstructions,
     twilightSettings,
-    setTwilightCustomInstructions
+    setTwilightCustomInstructions,
+    freeformSettings,
+    setFreeformCustomInstructions
   } = useModuleStore()
 
   const { settings } = useAppStore()
@@ -94,6 +97,8 @@ export function useInspectorTruth(params: {
           return renovateSettings.customInstructions
         case 'twilight':
           return twilightSettings.customInstructions
+        case 'freeform':
+          return freeformSettings.customInstructions
         default:
           return ''
       }
@@ -128,24 +133,32 @@ export function useInspectorTruth(params: {
         .filter((i) => selectedInjectorIds.has(i.id))
         .map((i) => i.promptFragment)
 
-      const guardrailPrompts = guardrails
+      // In simplified mode for staging, guardrails are baked into the base prompt
+      const skipGuardrails = params.moduleType === 'stage' && settings.promptStyle === 'simplified'
+      const guardrailPrompts = skipGuardrails ? [] : guardrails
         .filter((g: any) => selectedGuardrailIds.has(g.id))
         .map((g: any) => g.promptFragment)
 
       let basePrompt = ''
       if (params.moduleType === 'clean') basePrompt = buildCleanSlateBasePrompt()
       if (params.moduleType === 'stage') {
-        basePrompt = buildStagingBasePrompt({ 
-          roomType: stagingSettings.roomType, 
+        const promptParams = {
+          roomType: stagingSettings.roomType,
           style: stagingSettings.style,
           roomDimensions: stagingSettings.roomDimensions
-        })
+        }
+        basePrompt = settings.promptStyle === 'simplified'
+          ? buildStagingBasePromptSimplified(promptParams)
+          : buildStagingBasePrompt(promptParams)
       }
       if (params.moduleType === 'renovate') basePrompt = buildRenovateBasePrompt(renovateSettings.changes as any)
       if (params.moduleType === 'twilight') {
         basePrompt = twilightPresetTemplate
           ? buildTwilightPreviewBasePrompt(twilightPresetTemplate, twilightSettings.lightingCondition)
           : ''
+      }
+      if (params.moduleType === 'freeform') {
+        basePrompt = freeformSettings.craftedPrompt || ''
       }
 
       const result = await assemblePrompt({
@@ -169,8 +182,10 @@ export function useInspectorTruth(params: {
     selectedGuardrailIds,
     stagingSettings.roomType,
     stagingSettings.style,
+    settings.promptStyle,
     renovateSettings.changes,
     twilightPresetTemplate,
+    freeformSettings.craftedPrompt,
     extraInstructions
   ])
 
@@ -189,6 +204,9 @@ export function useInspectorTruth(params: {
         break
       case 'twilight':
         setTwilightCustomInstructions(value)
+        break
+      case 'freeform':
+        setFreeformCustomInstructions(value)
         break
     }
   }

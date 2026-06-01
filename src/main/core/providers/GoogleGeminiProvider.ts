@@ -96,8 +96,8 @@ export class GoogleGeminiProvider implements IImageProvider {
   private async makeRequest(
     model: string,
     prompt: string,
-    imageData: string,
-    mimeType: string,
+    imageData: string | undefined,
+    mimeType: string | undefined,
     imageSize: string,
     aspectRatio: string | undefined,
     seed: number | null,
@@ -110,7 +110,8 @@ export class GoogleGeminiProvider implements IImageProvider {
     const timeoutMs = imageSize === '4K' ? 600000 : 120000 // 10 min for 4K, 2 min for others
     
     const generationConfig: Record<string, unknown> = {
-      responseModalities: ['IMAGE']
+      responseModalities: ['IMAGE'],
+      temperature: 0.2  // Tighter output distribution for batch consistency
     }
     
     if (includeSeed && seed !== null) {
@@ -154,36 +155,47 @@ export class GoogleGeminiProvider implements IImageProvider {
       console.log(`[GoogleGeminiProvider] imageConfig:`, JSON.stringify(imageConfig))
     }
 
-    // Build parts array with prompt, source image, and optional reference images
+    // Build parts array with prompt, source image (if any), and optional reference images
     // For multi-image composition with Nano Banana Pro:
-    // - Image 1: source photograph to enhance
+    // - Image 1: source photograph to enhance (omitted for text-to-image)
     // - Image 2+: reference images with role assignments
     const parts: Array<Record<string, unknown>> = []
+    const hasSourceImage = !!imageData
 
     // Build prompt with reference image role assignments if present
     let fullPrompt = prompt
     if (referenceImages && referenceImages.length > 0) {
-      const roleAssignments = [
-        'Image 1: source photograph to enhance - preserve all architectural elements and composition'
-      ]
-      referenceImages.forEach((ref, index) => {
-        roleAssignments.push(`Image ${index + 2}: ${ref.role}`)
-      })
+      const roleAssignments: string[] = []
+      if (hasSourceImage) {
+        roleAssignments.push('Image 1: source photograph to enhance - preserve all architectural elements and composition')
+        referenceImages.forEach((ref, index) => {
+          roleAssignments.push(`Image ${index + 2}: ${ref.role}`)
+        })
+      } else {
+        // Text-to-image with composition references — number from 1
+        referenceImages.forEach((ref, index) => {
+          roleAssignments.push(`Image ${index + 1}: ${ref.role}`)
+        })
+      }
       fullPrompt = `${roleAssignments.join('\n')}\n\n${prompt}`
-      console.log(`[GoogleGeminiProvider] Using ${referenceImages.length} reference image(s)`)
+      console.log(`[GoogleGeminiProvider] Using ${referenceImages.length} reference image(s) (text-to-image: ${!hasSourceImage})`)
     }
 
     parts.push({ text: fullPrompt })
-    
-    // Add source image (Image 1)
-    parts.push({
-      inlineData: {
-        mimeType: mimeType,
-        data: imageData
-      }
-    })
 
-    // Add reference images (Image 2+)
+    // Add source image only when provided (skipped for text-to-image)
+    if (hasSourceImage) {
+      parts.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: imageData
+        }
+      })
+    } else {
+      console.log(`[GoogleGeminiProvider] Text-to-image mode — no source image`)
+    }
+
+    // Add reference images
     if (referenceImages && referenceImages.length > 0) {
       for (const ref of referenceImages) {
         parts.push({

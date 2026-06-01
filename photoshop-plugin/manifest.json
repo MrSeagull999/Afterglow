@@ -1,0 +1,31 @@
+{
+  "id": "com.afterglow.photoshop-plugin",
+  "name": "Afterglow",
+  "version": "1.0.0",
+  "manifestVersion": 6,
+  "main": "index.html",
+  "host": [
+    {
+      "app": "PS",
+      "minVersion": "24.0.0"
+    }
+  ],
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "afterglow-panel",
+      "label": {
+        "default": "Afterglow"
+      },
+      "minimumSize": { "width": 240, "height": 340 },
+      "defaultSize": { "width": 300, "height": 420 },
+      "mainPath": "index.html"
+    }
+  ],
+  "requiredPermissions": {
+    "network": {
+      "domains": ["http://localhost:3737"]
+    },
+    "localFileSystem": "fullAccess"
+  }
+}

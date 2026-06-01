@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore'
 import type { Asset, Version, VersionStatus, ModuleType } from '../../../shared/types'
 import { resolveGenerationStatus } from '../../../shared/resolveGenerationStatus'
 import {
+  AlertTriangle,
   Check,
   X,
   Eye,
@@ -50,7 +51,11 @@ const MODULE_COLORS: Record<ModuleType, string> = {
   twilight: 'bg-indigo-600',
   clean: 'bg-emerald-600',
   stage: 'bg-amber-600',
-  renovate: 'bg-purple-600'
+  renovate: 'bg-purple-600',
+  relight: 'bg-yellow-600',
+  freeform: 'bg-cyan-600',
+  imagegen: 'bg-violet-600',
+  sky: 'bg-sky-600'
 }
 
 export function ModuleGridTile({
@@ -75,6 +80,7 @@ export function ModuleGridTile({
   const [isRetrying, setIsRetrying] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
+  const [showEvalPopover, setShowEvalPopover] = useState(false)
 
   // Load thumbnail
   useEffect(() => {
@@ -228,6 +234,30 @@ export function ModuleGridTile({
     setSelectedVersionId(versionId === selectedVersionId ? null : versionId)
   }
 
+  const handleAcceptEvaluation = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!currentJob || !latestVersion) return
+    try {
+      await window.api.invoke('version:acceptEvaluation', currentJob.id, latestVersion.id)
+      setShowEvalPopover(false)
+      addToast('Result accepted', 'success')
+    } catch {
+      addToast('Failed to accept result', 'error')
+    }
+  }
+
+  const handleRegenerateFromEvaluation = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!currentJob || !latestVersion) return
+    try {
+      await window.api.invoke('version:regenerateFromEvaluation', currentJob.id, latestVersion.id)
+      setShowEvalPopover(false)
+      addToast('Re-generation started', 'success')
+    } catch {
+      addToast('Failed to start re-generation', 'error')
+    }
+  }
+
   // Grid view
   if (viewMode === 'grid') {
     if (libraryThumbOnly) {
@@ -250,7 +280,17 @@ export function ModuleGridTile({
           }`}
         >
           {thumbnail ? (
-            <img src={thumbnail} alt={asset.name} className="w-full h-full object-cover" />
+            <img
+              src={thumbnail}
+              alt={asset.name}
+              className="w-full h-full object-cover"
+              draggable
+              onDragStart={(e) => {
+                const path = displayedVersion?.outputPath || asset.originalPath
+                e.dataTransfer.setData('application/x-afterglow-path', path)
+                e.dataTransfer.effectAllowed = 'copy'
+              }}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Loader2 className="w-6 h-6 text-slate-500 animate-spin" />
@@ -331,6 +371,65 @@ export function ModuleGridTile({
               </div>
             )}
 
+            {/* Evaluation review flag */}
+            {displayedVersion?.evaluationFlag === 'needs_review' && !isGenerating && (
+              <div className="absolute top-2 right-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowEvalPopover(!showEvalPopover) }}
+                  className="flex items-center gap-1 px-2 py-1 bg-amber-600 hover:bg-amber-500 rounded text-xs text-white font-medium shadow"
+                  title="AI flagged this result for review"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  Review
+                </button>
+                {showEvalPopover && (
+                  <div
+                    className="absolute top-7 right-0 z-50 w-56 bg-slate-900 border border-amber-700 rounded-lg shadow-xl p-3 space-y-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="text-xs font-medium text-amber-300">AI Quality Review</div>
+                    {displayedVersion.evaluation && (
+                      <>
+                        <div className="text-xs text-slate-300">
+                          Score: <span className="font-bold text-amber-400">{displayedVersion.evaluation.overallScore}/10</span>
+                        </div>
+                        {typeof displayedVersion.evaluation.scores.referenceMatch === 'number' && (
+                          <div className="text-xs text-slate-300">
+                            Reference match: <span className={`font-bold ${
+                              displayedVersion.evaluation.scores.referenceMatch >= 8 ? 'text-emerald-400' :
+                              displayedVersion.evaluation.scores.referenceMatch >= 6 ? 'text-amber-400' :
+                              'text-red-400'
+                            }`}>{displayedVersion.evaluation.scores.referenceMatch}/10</span>
+                          </div>
+                        )}
+                        {displayedVersion.evaluation.issues.length > 0 && (
+                          <ul className="text-xs text-slate-400 space-y-0.5 list-disc list-inside">
+                            {displayedVersion.evaluation.issues.slice(0, 3).map((issue, i) => (
+                              <li key={i}>{issue}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={handleAcceptEvaluation}
+                        className="flex-1 py-1 text-xs bg-emerald-700 hover:bg-emerald-600 text-white rounded transition-colors"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={handleRegenerateFromEvaluation}
+                        className="flex-1 py-1 text-xs bg-amber-700 hover:bg-amber-600 text-white rounded transition-colors"
+                      >
+                        Re-gen
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Selection checkbox */}
             <button
               type="button"
@@ -349,8 +448,23 @@ export function ModuleGridTile({
             </button>
 
             {/* Status badge */}
-            <div className={`absolute bottom-2 left-2 px-2 py-0.5 rounded text-xs font-medium text-white ${statusConfig.color}`}>
-              {statusConfig.label}
+            <div className="absolute bottom-2 left-2 flex items-center gap-1">
+              <div className={`px-2 py-0.5 rounded text-xs font-medium text-white ${statusConfig.color}`}>
+                {statusConfig.label}
+              </div>
+              {/* Evaluation score badge */}
+              {displayedVersion?.evaluation && (
+                <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  displayedVersion.evaluation.overallScore >= 8 ? 'bg-emerald-600 text-white' :
+                  displayedVersion.evaluation.overallScore >= 6 ? 'bg-amber-600 text-white' :
+                  'bg-red-600 text-white'
+                }`} title={`Quality score: ${displayedVersion.evaluation.overallScore}/10${typeof displayedVersion.evaluation.scores.referenceMatch === 'number' ? `\nReference match: ${displayedVersion.evaluation.scores.referenceMatch}/10` : ''}${displayedVersion.evaluation.issues.length > 0 ? '\nIssues: ' + displayedVersion.evaluation.issues.join(', ') : ''}`}>
+                  {displayedVersion.evaluation.overallScore}
+                  {typeof displayedVersion.evaluation.scores.referenceMatch === 'number' && (
+                    <span className="opacity-75 ml-0.5">/{displayedVersion.evaluation.scores.referenceMatch}</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Module badge (if version exists) */}
@@ -560,6 +674,15 @@ function VersionHistoryItem({
       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-white ${statusConfig.color}`}>
         {statusConfig.label}
       </span>
+      {version.evaluation && (
+        <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${
+          version.evaluation.overallScore >= 8 ? 'bg-emerald-600/80 text-white' :
+          version.evaluation.overallScore >= 6 ? 'bg-amber-600/80 text-white' :
+          'bg-red-600/80 text-white'
+        }`}>
+          {version.evaluation.overallScore}
+        </span>
+      )}
       <span className="text-[10px] text-slate-400 flex-1 text-left">
         {new Date(version.createdAt).toLocaleString()}
       </span>

@@ -5,7 +5,7 @@
 // ENUMS & LITERALS
 // ─────────────────────────────────────────────────────────────
 
-export type ModuleType = 'twilight' | 'clean' | 'stage' | 'renovate' | 'relight'
+export type ModuleType = 'twilight' | 'clean' | 'stage' | 'renovate' | 'relight' | 'freeform' | 'imagegen' | 'sky'
 
 export type VersionStatus =
   | 'generating'
@@ -119,11 +119,37 @@ export interface Version {
   seed?: number | null
   model?: string
 
+  evaluation?: EvaluationResult
+  evaluationFlag?: 'needs_review' | 'accepted' | 'regenerated'
+
   createdAt: string
   lifecycleStatus?: 'draft' | 'approved'
   approvedAt?: number
   approvedBy?: string
   finalGeneratedAt?: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// EVALUATION (automated quality scoring)
+// ─────────────────────────────────────────────────────────────
+
+export interface EvaluationScores {
+  furnitureScale?: number     // 1-10: Are pieces realistically sized?
+  grounding?: number          // 1-10: Do items sit naturally on surfaces?
+  preservation?: number       // 1-10: Are architecture/surfaces/fixtures unchanged?
+  styleCoherence?: number     // 1-10: Does everything look like it belongs together?
+  photoRealism?: number       // 1-10: Would this pass as a real photograph?
+  skyRealism?: number         // 1-10: (twilight/relight) Is the sky/lighting natural?
+  lightingConsistency?: number // 1-10: (twilight/relight) Is lighting consistent?
+  referenceMatch?: number     // 1-10: Does output match reference image sky/tone/atmosphere?
+}
+
+export interface EvaluationResult {
+  overallScore: number        // 1-10 average
+  scores: EvaluationScores
+  issues: string[]            // Specific problems found
+  evaluatedAt: string
+  attempt: number             // Which generation attempt this evaluates (1 = first try)
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -40,25 +40,20 @@ export class OpenRouterProvider implements IImageProvider {
       
       // OpenRouter uses OpenAI-compatible format
       
+      // Build message content — skip source image for text-to-image (no imageData)
+      const messageContent: Array<Record<string, any>> = [
+        { type: 'text', text: prompt }
+      ]
+      if (imageData) {
+        messageContent.push({
+          type: 'image_url',
+          image_url: { url: `data:${mimeType};base64,${imageData}` }
+        })
+      }
+
       const body: Record<string, any> = {
         model: model,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: prompt
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${mimeType};base64,${imageData}`
-                }
-              }
-            ]
-          }
-        ],
+        messages: [{ role: 'user', content: messageContent }],
         // Request image generation
         response_format: { type: 'image' },
         max_tokens: 1000

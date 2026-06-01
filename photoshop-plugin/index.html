@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, 'Adobe Clean', sans-serif;
+      font-size: 12px;
+      padding: 14px;
+      color: #c8c8c8;
+      background: #2b2b2b;
+    }
+
+    h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e0e0e0;
+      margin-bottom: 14px;
+      letter-spacing: 0.3px;
+    }
+
+    label {
+      display: block;
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 4px;
+      margin-top: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    label:first-of-type {
+      margin-top: 0;
+    }
+
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      background: #3c3c3c;
+      color: #d0d0d0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      font-size: 12px;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 24px;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #0078d4;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 6px 8px;
+      background: #3c3c3c;
+      color: #d0d0d0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #0078d4;
+    }
+
+    #sendBtn, #chatSendBtn, #usePromptBtn {
+      width: 100%;
+      padding: 9px;
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #sendBtn:hover:not(:disabled),
+    #chatSendBtn:hover:not(:disabled),
+    #usePromptBtn:hover:not(:disabled) {
+      background: #0066b4;
+    }
+
+    #sendBtn:disabled,
+    #chatSendBtn:disabled,
+    #usePromptBtn:disabled {
+      background: #444;
+      color: #777;
+      cursor: not-allowed;
+    }
+
+    #usePromptBtn {
+      margin-top: 6px;
+      background: #2d7d46;
+    }
+    #usePromptBtn:hover:not(:disabled) {
+      background: #256b3a;
+    }
+
+    #statusWrap {
+      margin-top: 14px;
+      min-height: 48px;
+    }
+
+    #status {
+      font-size: 11px;
+      color: #999;
+      line-height: 1.5;
+    }
+
+    #status.error { color: #e06c6c; }
+    #status.success { color: #6ec26e; }
+
+    #progress {
+      height: 2px;
+      background: #444;
+      border-radius: 1px;
+      margin-top: 8px;
+      overflow: hidden;
+      display: none;
+    }
+
+    #progressBar {
+      height: 100%;
+      width: 0%;
+      background: #0078d4;
+      border-radius: 1px;
+      transition: width 0.4s ease;
+    }
+
+    .hint {
+      margin-top: 16px;
+      font-size: 10px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    /* Chat section */
+    #chatSection {
+      display: none;
+      margin-top: 10px;
+    }
+
+    #chatMessages {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    #chatMessages:empty::before {
+      content: 'Chat with AI to craft your prompt…';
+      color: #666;
+      font-style: italic;
+    }
+
+    .chat-msg {
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+
+    .chat-msg:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .chat-msg .role {
+      font-weight: 600;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .chat-msg.user .role { color: #7eb8e0; }
+    .chat-msg.assistant .role { color: #a0d995; }
+
+    .chat-msg .text {
+      color: #bbb;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    #chatInputRow {
+      display: flex;
+      gap: 6px;
+    }
+
+    #chatInput {
+      flex: 1;
+      padding: 6px 8px;
+      background: #3c3c3c;
+      color: #d0d0d0;
+      border: 1px solid #555;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    #chatInput:focus {
+      outline: none;
+      border-color: #0078d4;
+    }
+
+    #chatSendBtn {
+      width: auto;
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+
+    #chatStatus {
+      font-size: 10px;
+      color: #666;
+      margin-top: 4px;
+      min-height: 14px;
+    }
+
+    /* Prompt section (shown after chat suggests one) */
+    #promptSection {
+      display: none;
+      margin-top: 10px;
+    }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid #444;
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+  <h4>Afterglow</h4>
+
+  <label>Module</label>
+  <select id="moduleSelect">
+    <option value="twilight">Twilight</option>
+    <option value="clean">Clean Slate</option>
+    <option value="stage">Staging</option>
+    <option value="renovate">Renovate</option>
+    <option value="relight">Relight</option>
+    <option value="freeform">Freeform (AI Chat)</option>
+  </select>
+
+  <div id="chatSection">
+    <hr class="section-divider">
+    <label>Chat with AI</label>
+    <div id="chatMessages"></div>
+    <div id="chatInputRow">
+      <input type="text" id="chatInput" placeholder="Describe what you want to do…">
+      <button id="chatSendBtn">Send</button>
+    </div>
+    <div id="chatStatus"></div>
+
+    <div id="promptSection">
+      <hr class="section-divider">
+      <label>Crafted Prompt</label>
+      <textarea id="craftedPrompt" rows="4" placeholder="AI-suggested prompt will appear here…"></textarea>
+      <button id="usePromptBtn" style="display:none">Use Suggested Prompt</button>
+    </div>
+  </div>
+
+  <label>Quality</label>
+  <select id="tierSelect">
+    <option value="hq">HQ Preview (2K)</option>
+    <option value="final">Final (4K)</option>
+  </select>
+
+  <button id="sendBtn">Send to Afterglow</button>
+
+  <div id="statusWrap">
+    <div id="status">Open a document in Photoshop, then click Send.</div>
+    <div id="progress"><div id="progressBar"></div></div>
+  </div>
+
+  <p class="hint">
+    Result is placed as a new layer on the current document.<br>
+    Cmd+S saves back to Lightroom.
+  </p>
+
+  <script src="index.js"></script>
+</body>
+</html>

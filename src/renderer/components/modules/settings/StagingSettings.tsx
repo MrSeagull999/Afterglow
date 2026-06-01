@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { useModuleStore } from '../../../store/useModuleStore'
 import { useJobStore } from '../../../store/useJobStore'
 import { Star, Layers, Ruler } from 'lucide-react'
@@ -14,6 +14,7 @@ export function StagingSettings() {
     stagingSettings,
     setStagingRoomType,
     setStagingStyle,
+    setStagingEnableSceneMode,
     setStagingIsMasterView,
     setStagingRoomDimensions,
     roomTypes,
@@ -21,7 +22,8 @@ export function StagingSettings() {
     loadConstants
   } = useModuleStore()
 
-  const [enableSceneMode, setEnableSceneMode] = useState(false)
+  const enableSceneMode = stagingSettings.enableSceneMode
+  const setEnableSceneMode = setStagingEnableSceneMode
 
   useEffect(() => {
     loadConstants()
@@ -195,7 +197,7 @@ export function StagingSettings() {
             Scene Mode Active
           </div>
           <p className="text-xs text-slate-400">
-            Select images from the same room, then mark one as the "Master View" by clicking the star icon on its tile. Other images will reference the master's furniture placement.
+            Select multiple images from the same room (Shift+click to multi-select). Check "First selected image is Master View" below, then generate. Other angles will reference the master's furniture placement.
           </p>
           <label className="flex items-center gap-3 p-2 hover:bg-slate-800/50 rounded cursor-pointer">
             <input

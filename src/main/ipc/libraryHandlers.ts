@@ -1,4 +1,6 @@
 import { ipcMain, shell } from 'electron'
+import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import type { ModuleType, VersionStatus } from '../../shared/types'
 import {
   queryLibrary,
@@ -47,5 +49,15 @@ export function registerLibraryHandlers(): void {
 
   ipcMain.handle('file:showInFinder', async (_event, filePath: string) => {
     shell.showItemInFolder(filePath)
+  })
+
+  ipcMain.handle('file:readAsBase64', async (_event, filePath: string) => {
+    if (!filePath || !existsSync(filePath)) {
+      return { success: false, error: 'File not found' }
+    }
+    const buffer = await readFile(filePath)
+    const ext = filePath.split('.').pop()?.toLowerCase() || 'png'
+    const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', tif: 'image/tiff', tiff: 'image/tiff' }
+    return { success: true, base64: buffer.toString('base64'), mimeType: mimeMap[ext] || 'image/png' }
   })
 }

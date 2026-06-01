@@ -14,7 +14,9 @@ export function ReferenceImageSettings() {
     relight: [],
     clean: [],
     stage: [],
-    renovate: []
+    renovate: [],
+    freeform: [],
+    imagegen: []
   })
   const [isAdding, setIsAdding] = useState(false)
   const [newRefName, setNewRefName] = useState('')
@@ -31,7 +33,9 @@ export function ReferenceImageSettings() {
       relight: [],
       clean: [],
       stage: [],
-      renovate: []
+      renovate: [],
+      freeform: [],
+      imagegen: []
     }
 
     for (const mod of MODULES_WITH_REFERENCES) {

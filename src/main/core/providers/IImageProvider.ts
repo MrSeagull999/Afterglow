@@ -7,8 +7,8 @@ export interface ReferenceImageInput {
 export interface ImageGenerationRequest {
   model: string
   prompt: string
-  imageData: string
-  mimeType: string
+  imageData?: string   // Optional — omit for text-to-image (no source photo)
+  mimeType?: string    // Optional — omit for text-to-image
   imageSize?: '1024x1024' | '1536x1536' | '2048x2048' | '4K'
   aspectRatio?: '16:9' | '4:3' | '1:1' | string
   seed?: number | null

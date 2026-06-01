@@ -2,7 +2,7 @@ export interface Guardrail {
   id: string
   label: string
   promptFragment: string
-  appliesTo: ('clean' | 'stage' | 'renovate' | 'twilight' | 'relight')[]
+  appliesTo: ('clean' | 'stage' | 'renovate' | 'twilight' | 'relight' | 'freeform')[]
 }
 
 export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
@@ -46,7 +46,7 @@ export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
     id: 'preserve_camera_angle',
     label: 'Preserve Camera Angle',
     promptFragment: 'Maintain the exact same camera angle, perspective, and field of view.',
-    appliesTo: ['clean', 'stage', 'renovate', 'twilight', 'relight']
+    appliesTo: ['clean', 'stage', 'renovate', 'twilight', 'relight', 'freeform']
   },
   {
     id: 'preserve_lighting_fixtures',
@@ -58,7 +58,7 @@ export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
     id: 'photorealistic',
     label: 'Photorealistic Quality',
     promptFragment: 'The result must be photorealistic and indistinguishable from a professional real estate photograph.',
-    appliesTo: ['clean', 'stage', 'renovate', 'twilight', 'relight']
+    appliesTo: ['clean', 'stage', 'renovate', 'twilight', 'relight', 'freeform']
   },
   {
     id: 'realistic_scale',
@@ -68,8 +68,8 @@ export const ARCHITECTURAL_GUARDRAILS: Guardrail[] = [
   }
 ]
 
-export function getGuardrailsForModule(module: 'clean' | 'stage' | 'renovate' | 'twilight' | 'relight'): Guardrail[] {
-  return ARCHITECTURAL_GUARDRAILS.filter(g => g.appliesTo.includes(module))
+export function getGuardrailsForModule(module: import('../../../../shared/types').ModuleType): Guardrail[] {
+  return ARCHITECTURAL_GUARDRAILS.filter(g => g.appliesTo.includes(module as 'clean' | 'stage' | 'renovate' | 'twilight' | 'relight' | 'freeform'))
 }
 
 export function buildGuardrailPrompt(guardrailIds: string[]): string {
@@ -77,6 +77,6 @@ export function buildGuardrailPrompt(guardrailIds: string[]): string {
   return guardrails.map(g => g.promptFragment).join(' ')
 }
 
-export function getDefaultGuardrailIds(module: 'clean' | 'stage' | 'renovate' | 'twilight' | 'relight'): string[] {
+export function getDefaultGuardrailIds(module: import('../../../../shared/types').ModuleType): string[] {
   return getGuardrailsForModule(module).map(g => g.id)
 }

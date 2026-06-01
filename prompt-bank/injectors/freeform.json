@@ -1,0 +1,22 @@
+{
+  "injectors": [
+    {
+      "id": "photorealistic",
+      "category": "quality",
+      "label": "Photorealistic Output",
+      "promptFragment": "The result must be photorealistic and indistinguishable from a professional photograph."
+    },
+    {
+      "id": "preserve_composition",
+      "category": "preservation",
+      "label": "Preserve Composition",
+      "promptFragment": "Maintain the overall composition, framing, and camera angle of the original image."
+    },
+    {
+      "id": "preserve_lighting",
+      "category": "preservation",
+      "label": "Preserve Lighting",
+      "promptFragment": "Preserve the lighting conditions and atmosphere of the original scene."
+    }
+  ]
+}

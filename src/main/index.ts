@@ -4,6 +4,9 @@ import { config } from 'dotenv'
 import { setupIpcHandlers } from './ipc'
 import { registerAllHandlers } from './ipc/index'
 import { migrateJobsToUserData, hasLegacyJobs, getDataBasePath } from './core/paths'
+import { startHttpServer } from './server/httpServer'
+import { startWatching, stopWatching, getWatchFolderState } from './core/services/watchFolder/watchFolderService'
+import { getSettings, updateSettings } from './core/settings'
 
 // Load .env from project root
 const envPath = app.isPackaged 
@@ -62,7 +65,7 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   // Log data storage location
   console.log('Data storage path:', getDataBasePath())
-  
+
   // Migrate legacy jobs from project folder to userData
   if (hasLegacyJobs()) {
     console.log('[Migration] Found legacy jobs folder, starting migration...')
@@ -74,8 +77,18 @@ app.whenReady().then(async () => {
       console.error('[Migration] Errors:', errors)
     }
   }
-  
+
+  startHttpServer(3737)
   createWindow()
+
+  // Start watch folder if it was enabled in settings
+  const settings = await getSettings()
+  if (settings.watchFolderEnabled && settings.watchFolderPath && settings.watchFolderJobId) {
+    const result = startWatching(settings.watchFolderPath, settings.watchFolderJobId)
+    if (!result.success) {
+      console.warn('[WatchFolder] Failed to start on launch:', result.error)
+    }
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -93,6 +106,34 @@ app.on('window-all-closed', () => {
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
+// ── Watch Folder IPC handlers ────────────────────────────────────────────────
+
+ipcMain.handle('watchFolder:start', async (_event, folderPath: string, jobId: string) => {
+  const result = startWatching(folderPath, jobId)
+  if (result.success) {
+    await updateSettings({ watchFolderEnabled: true, watchFolderPath: folderPath, watchFolderJobId: jobId })
+  }
+  return result
+})
+
+ipcMain.handle('watchFolder:stop', async () => {
+  stopWatching()
+  await updateSettings({ watchFolderEnabled: false })
+  return { success: true }
+})
+
+ipcMain.handle('watchFolder:getState', () => {
+  return getWatchFolderState()
+})
+
+ipcMain.handle('watchFolder:selectFolder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    title: 'Choose watch folder (Lightroom export location)'
   })
   return result.canceled ? null : result.filePaths[0]
 })

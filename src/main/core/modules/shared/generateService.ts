@@ -2,22 +2,25 @@ import { readFile, mkdir } from 'fs/promises'
 import { join, dirname, basename } from 'path'
 import { existsSync } from 'fs'
 import sharp from 'sharp'
+import { BrowserWindow } from 'electron'
 import { generateSeed } from '../../gemini/geminiClient'
 import { getSettings } from '../../settings'
 import { saveImageWithExifHandling } from '../../exif'
-import type { Version, ModuleType } from '../../../../shared/types'
+import type { Version, ModuleType, EvaluationResult } from '../../../../shared/types'
 import type { ReferenceImageInput } from '../../providers/IImageProvider'
 import {
   getVersion,
   setVersionStatus,
   setVersionOutput,
-  setVersionGenerationStatus
+  setVersionGenerationStatus,
+  updateVersion
 } from '../../store/versionStore'
 import { getAsset } from '../../store/assetStore'
 import { getJobDirectory } from '../../store/jobStore'
 import { getResolvedImageProvider } from '../../providers/providerRouter'
 import { generationLogger } from '../../services/generation/generationLogger'
 import { assemblePrompt } from '../../../../shared/services/prompt/promptAssembler'
+import { evaluateGeneration } from '../../services/evaluation/evaluationService'
 import { v4 as uuidv4 } from 'uuid'
 
 /**
@@ -226,70 +229,50 @@ export async function generateVersionPreview(
     }
     
     // Load reference image if specified in recipe
-    const referenceImagePath = version.recipe.settings.referenceImagePath as string | undefined
     const referenceImages: ReferenceImageInput[] = []
-    if (referenceImagePath) {
-      console.log(`[GenerateService] Reference image path in recipe: ${referenceImagePath}`)
-      const refImage = await loadReferenceImage(
-        referenceImagePath,
-        'lighting reference - apply the exact lighting conditions, sky color and gradient, interior light color temperature, and ambient atmosphere from this reference'
-      )
-      if (refImage) {
-        referenceImages.push(refImage)
-        console.log(`[GenerateService] ✓ Reference image LOADED for ${version.module} (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
-      } else {
-        console.log(`[GenerateService] ✗ Reference image FAILED to load for ${version.module}`)
+    const recipeReferenceImages = version.recipe.settings.referenceImages as Array<{ path?: string; role?: string }> | undefined
+
+    console.log(`[GenerateService] 🖼️  Preview: Checking for reference image(s) in recipe...`)
+    if (Array.isArray(recipeReferenceImages) && recipeReferenceImages.length > 0) {
+      console.log(`[GenerateService] 📚 Preview: Found ${recipeReferenceImages.length} structured reference image(s)`)
+      for (const [index, ref] of recipeReferenceImages.entries()) {
+        if (!ref?.path) continue
+        const role = ref.role || `reference image ${index + 1}`
+        console.log(`[GenerateService] 📎 Preview: Ref ${index + 1} path: ${ref.path}`)
+        console.log(`[GenerateService] 📎 Preview: Ref ${index + 1} role: ${role.substring(0, 80)}...`)
+        const refImage = await loadReferenceImage(ref.path, role)
+        if (refImage) {
+          referenceImages.push(refImage)
+          console.log(`[GenerateService] ✅ Preview: Ref ${index + 1} LOADED (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+        } else {
+          console.log(`[GenerateService] ❌ Preview: Ref ${index + 1} FAILED to load`)
+        }
       }
     } else {
-      console.log(`[GenerateService] No reference image specified for ${version.module}`)
-    }
-
-    const response = await provider.generateImage({
-      prompt: fullPrompt,
-      imageData: base64Image,
-      mimeType,
-      model,
-      imageSize: '1024x1024',
-      seed,
-      priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter',
-      referenceImages: referenceImages.length > 0 ? referenceImages : undefined
-    })
-
-    onProgress?.(80)
-
-    // Log generation attempt
-    generationLogger.log({
-      timestamp: new Date().toISOString(),
-      jobId,
-      versionId,
-      provider: providerName,
-      requestId,
-      model,
-      endpoint,
-      endpointBaseUrl: resolved.endpointBaseUrl,
-      resolvedBy: resolved.resolvedBy,
-      envOverride: resolved.envOverride,
-      promptHash,
-      module: version.module,
-      selectionCount,
-      success: response.success,
-      error: response.error
-    })
-
-    if (!response.success || !response.imageData) {
-      await setVersionGenerationStatus(jobId, versionId, 'failed', response.error || 'Generation failed')
-      await setVersionStatus(jobId, versionId, 'error', response.error || 'Generation failed')
-      return {
-        success: false,
-        error: response.error || 'Generation failed'
+      const referenceImagePath = version.recipe.settings.referenceImagePath as string | undefined
+      const referenceImageRole = (version.recipe.settings.referenceImageRole as string | undefined) ||
+        'lighting reference - apply the exact lighting conditions, sky color and gradient, interior light color temperature, and ambient atmosphere from this reference'
+      if (referenceImagePath) {
+        console.log(`[GenerateService] 📎 Preview: Found reference image path: ${referenceImagePath}`)
+        console.log(`[GenerateService] 📎 Preview: Reference role: ${referenceImageRole.substring(0, 80)}...`)
+        const refImage = await loadReferenceImage(referenceImagePath, referenceImageRole)
+        if (refImage) {
+          referenceImages.push(refImage)
+          console.log(`[GenerateService] ✅ Preview: Reference image LOADED successfully (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+        } else {
+          console.log(`[GenerateService] ❌ Preview: Reference image FAILED to load (file may not exist)`)
+        }
+      } else {
+        console.log(`[GenerateService] ℹ️  Preview: No reference image in recipe for ${version.module}`)
+        if (version.module === 'stage') {
+          console.log(`[GenerateService] ℹ️  (For multi-angle staging: this is either the master view, or multi-angle mode wasn't enabled)`)
+        }
       }
     }
 
-    // Save output
-    const outputBuffer = Buffer.from(response.imageData, 'base64')
+    // Setup output paths
     const outputFormat = settings.outputFormat === 'jpeg' ? 'jpeg' : 'png'
     const ext = outputFormat === 'jpeg' ? '.jpg' : '.png'
-
     const jobDir = getJobDirectory(jobId)
     const outputDir = join(jobDir, 'outputs', 'previews')
     const thumbnailDir = join(jobDir, 'outputs', 'thumbnails')
@@ -304,18 +287,160 @@ export async function generateVersionPreview(
     const outputPath = join(outputDir, `${versionId}${ext}`)
     const thumbnailPath = join(thumbnailDir, `${versionId}_thumb.jpg`)
 
-    await saveImageWithExifHandling(outputBuffer, outputPath, settings.keepExif, outputFormat)
+    // Determine evaluation settings
+    const evalEnabled = settings.evaluationEnabled ?? false
+    const evalThreshold = settings.evaluationThreshold ?? 7
+    const evalMaxRetries = settings.evaluationMaxRetries ?? 1
+    const evalReviewMode = (settings as any).evaluationReviewMode ?? 'flag_for_review'
+    const flagForReview = evalEnabled && evalReviewMode === 'flag_for_review'
+    // In flag_for_review mode: only 1 attempt (no auto-retry), then flag if below threshold
+    const maxAttempts = evalEnabled && !flagForReview ? (1 + evalMaxRetries) : 1
 
-    // Generate thumbnail
-    await sharp(outputBuffer)
-      .resize(300, 300, { fit: 'cover' })
-      .jpeg({ quality: 80 })
-      .toFile(thumbnailPath)
+    let bestEvaluation: EvaluationResult | null = null
+    let bestOutputBuffer: Buffer | null = null
+    let bestSeed: number | null = seed
+    let lastSeedRejected = false
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const currentSeed = attempt === 1 ? seed : generateSeed()
+
+      const response = await provider.generateImage({
+        prompt: fullPrompt,
+        imageData: base64Image,
+        mimeType,
+        model,
+        imageSize: '1024x1024',
+        seed: currentSeed,
+        priorityMode: settings.previewPriorityMode && resolved.provider === 'openrouter',
+        referenceImages: referenceImages.length > 0 ? referenceImages : undefined
+      })
+
+      // Log generation attempt
+      generationLogger.log({
+        timestamp: new Date().toISOString(),
+        jobId,
+        versionId,
+        provider: providerName,
+        requestId: attempt === 1 ? requestId : uuidv4(),
+        model,
+        endpoint,
+        endpointBaseUrl: resolved.endpointBaseUrl,
+        resolvedBy: resolved.resolvedBy,
+        envOverride: resolved.envOverride,
+        promptHash,
+        module: version.module,
+        selectionCount,
+        success: response.success,
+        error: response.error
+      })
+
+      if (!response.success || !response.imageData) {
+        // If first attempt fails, report error. If retry fails, use best previous result.
+        if (bestOutputBuffer) break
+        await setVersionGenerationStatus(jobId, versionId, 'failed', response.error || 'Generation failed')
+        await setVersionStatus(jobId, versionId, 'error', response.error || 'Generation failed')
+        return {
+          success: false,
+          error: response.error || 'Generation failed'
+        }
+      }
+
+      lastSeedRejected = response.seedRejected ?? false
+      const outputBuffer = Buffer.from(response.imageData, 'base64')
+
+      // Save the output (overwrite if retrying)
+      await saveImageWithExifHandling(outputBuffer, outputPath, settings.keepExif, outputFormat)
+      await sharp(outputBuffer)
+        .resize(300, 300, { fit: 'cover' })
+        .jpeg({ quality: 80 })
+        .toFile(thumbnailPath)
+
+      // Evaluate if enabled
+      if (evalEnabled) {
+        console.log(`[GenerateService] 🔍 Evaluation enabled - assessing output quality...`)
+        const evalRefPath = Array.isArray(recipeReferenceImages) && recipeReferenceImages.length > 0
+          ? recipeReferenceImages[0].path
+          : (version.recipe.settings.referenceImagePath as string | undefined)
+        const evaluation = await evaluateGeneration(outputPath, version.module, undefined, attempt, evalRefPath)
+
+        if (evaluation) {
+          if (!bestEvaluation || evaluation.overallScore > bestEvaluation.overallScore) {
+            bestEvaluation = evaluation
+            bestOutputBuffer = outputBuffer
+            bestSeed = response.seedRejected ? null : currentSeed
+          }
+
+          // Good enough - stop retrying
+          if (evaluation.overallScore >= evalThreshold) {
+            console.log(`[GenerateService] Evaluation passed (${evaluation.overallScore}/${evalThreshold}) on attempt ${attempt}`)
+            break
+          }
+
+          // Below threshold — flag for review instead of auto-retrying
+          if (flagForReview) {
+            console.log(`[GenerateService] Score ${evaluation.overallScore} below threshold ${evalThreshold} — flagging for user review`)
+            bestOutputBuffer = outputBuffer
+            bestSeed = response.seedRejected ? null : currentSeed
+            break
+          }
+
+          // Below threshold - retry if we have attempts left
+          if (attempt < maxAttempts) {
+            console.log(`[GenerateService] Score ${evaluation.overallScore} below threshold ${evalThreshold}, retrying (attempt ${attempt + 1}/${maxAttempts})...`)
+          } else {
+            console.log(`[GenerateService] Score ${evaluation.overallScore} below threshold ${evalThreshold}, no retries left. Using best result.`)
+          }
+        } else {
+          // Evaluation failed - keep this result and stop
+          bestOutputBuffer = outputBuffer
+          bestSeed = response.seedRejected ? null : currentSeed
+          break
+        }
+      } else {
+        // No evaluation - keep first result
+        console.log(`[GenerateService] ⏭️  Evaluation disabled - using first generation result`)
+        bestOutputBuffer = outputBuffer
+        bestSeed = response.seedRejected ? null : currentSeed
+        break
+      }
+    }
+
+    // If we retried and a previous attempt was better, restore it
+    if (bestEvaluation && bestOutputBuffer && bestEvaluation.attempt > 0) {
+      // If the best result isn't the last one saved, rewrite the output
+      const lastSavedAttempt = Math.min(maxAttempts, bestEvaluation.attempt)
+      if (lastSavedAttempt !== bestEvaluation.attempt) {
+        await saveImageWithExifHandling(bestOutputBuffer, outputPath, settings.keepExif, outputFormat)
+        await sharp(bestOutputBuffer)
+          .resize(300, 300, { fit: 'cover' })
+          .jpeg({ quality: 80 })
+          .toFile(thumbnailPath)
+      }
+    }
 
     onProgress?.(95)
 
-    // Update version
+    // Update version with output and evaluation
     await setVersionOutput(jobId, versionId, outputPath, thumbnailPath)
+    if (bestEvaluation) {
+      console.log(`[GenerateService] 💾 Saving evaluation score ${bestEvaluation.overallScore}/10 to version ${versionId}`)
+      const belowThreshold = bestEvaluation.overallScore < evalThreshold
+      const evalFlag = (flagForReview && belowThreshold) ? 'needs_review' : undefined
+      await updateVersion(jobId, versionId, {
+        evaluation: bestEvaluation,
+        ...(evalFlag ? { evaluationFlag: evalFlag } : {})
+      })
+      // Notify renderer when flagging for review
+      if (evalFlag === 'needs_review') {
+        const wins = BrowserWindow.getAllWindows()
+        wins.forEach(w => w.webContents.send('version:evaluation-flagged', {
+          versionId,
+          evaluation: bestEvaluation
+        }))
+      }
+    } else if (evalEnabled) {
+      console.log(`[GenerateService] ⚠️  Evaluation was enabled but no score was generated`)
+    }
     await setVersionGenerationStatus(jobId, versionId, 'completed')
     await setVersionStatus(jobId, versionId, 'preview_ready')
 
@@ -325,13 +450,14 @@ export async function generateVersionPreview(
       success: true,
       outputPath,
       thumbnailPath,
-      seed: response.seedRejected ? null : seed
+      seed: bestSeed
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     console.error('[GenerateService] Error:', errorMessage)
     await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
+    onProgress?.(100) // Always notify renderer so tile updates to error state
     return {
       success: false,
       error: errorMessage
@@ -368,6 +494,7 @@ export async function generateVersionHQPreview(
         inputPath = sourceVersion.outputPath
       }
     }
+    console.log(`[GenerateService] HQ Preview input resolved for asset:${asset.id} version:${versionId} sourceVersion:${version.sourceVersionIds[0] || 'none'} path:${inputPath}`)
     
     if (asset.workingSourcePath) {
       console.log(`[GenerateService] HQ Preview using working source: ${asset.workingSourcePath}`)
@@ -433,22 +560,42 @@ export async function generateVersionHQPreview(
       : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
 
     // Load reference image if specified in recipe
-    const referenceImagePath = version.recipe.settings.referenceImagePath as string | undefined
     const referenceImages: ReferenceImageInput[] = []
-    if (referenceImagePath) {
-      console.log(`[GenerateService] HQ Preview: Reference image path in recipe: ${referenceImagePath}`)
-      const refImage = await loadReferenceImage(
-        referenceImagePath,
-        'lighting reference - apply the exact lighting conditions, sky color and gradient, interior light color temperature, and ambient atmosphere from this reference'
-      )
-      if (refImage) {
-        referenceImages.push(refImage)
-        console.log(`[GenerateService] HQ Preview: ✓ Reference image LOADED for ${version.module} (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
-      } else {
-        console.log(`[GenerateService] HQ Preview: ✗ Reference image FAILED to load for ${version.module}`)
+    const recipeReferenceImages = version.recipe.settings.referenceImages as Array<{ path?: string; role?: string }> | undefined
+
+    console.log(`[GenerateService] 🖼️  HQ Preview: Checking for reference image(s) in recipe...`)
+    if (Array.isArray(recipeReferenceImages) && recipeReferenceImages.length > 0) {
+      console.log(`[GenerateService] 📚 HQ Preview: Found ${recipeReferenceImages.length} structured reference image(s)`)
+      for (const [index, ref] of recipeReferenceImages.entries()) {
+        if (!ref?.path) continue
+        const role = ref.role || `reference image ${index + 1}`
+        console.log(`[GenerateService] 📎 HQ Preview: Ref ${index + 1} path: ${ref.path}`)
+        console.log(`[GenerateService] 📎 HQ Preview: Ref ${index + 1} role: ${role.substring(0, 80)}...`)
+        const refImage = await loadReferenceImage(ref.path, role)
+        if (refImage) {
+          referenceImages.push(refImage)
+          console.log(`[GenerateService] ✅ HQ Preview: Ref ${index + 1} LOADED (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+        } else {
+          console.log(`[GenerateService] ❌ HQ Preview: Ref ${index + 1} FAILED to load`)
+        }
       }
     } else {
-      console.log(`[GenerateService] HQ Preview: No reference image specified for ${version.module}`)
+      const referenceImagePath = version.recipe.settings.referenceImagePath as string | undefined
+      const referenceImageRole = (version.recipe.settings.referenceImageRole as string | undefined) ||
+        'lighting reference - apply the exact lighting conditions, sky color and gradient, interior light color temperature, and ambient atmosphere from this reference'
+      if (referenceImagePath) {
+        console.log(`[GenerateService] 📎 HQ Preview: Found reference image path: ${referenceImagePath}`)
+        console.log(`[GenerateService] 📎 HQ Preview: Reference role: ${referenceImageRole.substring(0, 80)}...`)
+        const refImage = await loadReferenceImage(referenceImagePath, referenceImageRole)
+        if (refImage) {
+          referenceImages.push(refImage)
+          console.log(`[GenerateService] ✅ HQ Preview: Reference image LOADED successfully (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+        } else {
+          console.log(`[GenerateService] ❌ HQ Preview: Reference image FAILED to load (file may not exist)`)
+        }
+      } else {
+        console.log(`[GenerateService] ℹ️  HQ Preview: No reference image in recipe for ${version.module}`)
+      }
     }
 
     const response = await provider.generateImage({
@@ -506,14 +653,36 @@ export async function generateVersionHQPreview(
 
     await saveImageWithExifHandling(outputBuffer, outputPath, settings.keepExif, outputFormat)
 
-    onProgress?.(95)
+    onProgress?.(90)
 
     await setVersionOutput(jobId, versionId, outputPath)
+
+    // Evaluate HQ output if enabled
+    const evalEnabled = settings.evaluationEnabled ?? false
+    const { updateVersion } = await import('../../store/versionStore')
+
+    if (evalEnabled) {
+      console.log(`[GenerateService] 🔍 HQ Evaluation enabled - assessing output quality...`)
+      const evalRefPath = Array.isArray(recipeReferenceImages) && recipeReferenceImages.length > 0
+        ? recipeReferenceImages[0].path
+        : (version.recipe.settings.referenceImagePath as string | undefined)
+      const evaluation = await evaluateGeneration(outputPath, version.module, undefined, 1, evalRefPath)
+      if (evaluation) {
+        console.log(`[GenerateService] 💾 HQ Evaluation score ${evaluation.overallScore}/10 for version ${versionId}`)
+        await updateVersion(jobId, versionId, { evaluation })
+      } else {
+        console.log(`[GenerateService] ⚠️  HQ Evaluation was enabled but no score was generated`)
+      }
+    } else {
+      console.log(`[GenerateService] ⏭️  HQ Evaluation disabled`)
+    }
+
+    onProgress?.(95)
+
     await setVersionGenerationStatus(jobId, versionId, 'completed')
     await setVersionStatus(jobId, versionId, 'hq_ready')
 
     // Update quality tier
-    const { updateVersion } = await import('../../store/versionStore')
     await updateVersion(jobId, versionId, { qualityTier: 'hq_preview' })
 
     onProgress?.(100)
@@ -528,6 +697,7 @@ export async function generateVersionHQPreview(
     console.error('[GenerateService] HQ error:', errorMessage)
     await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
+    onProgress?.(100) // Always notify renderer so tile updates to error state
     return {
       success: false,
       error: errorMessage
@@ -712,6 +882,7 @@ export async function generateVersionFinal(
     console.error('[GenerateService] Final error:', errorMessage)
     await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
+    onProgress?.(100) // Always notify renderer so tile updates to error state
     return {
       success: false,
       error: errorMessage
@@ -831,6 +1002,27 @@ export async function generateVersionNative4K(
       console.warn(`[GenerateService] Native 4K: Prompt hash mismatch! stored=${storedHash} computed=${promptHash}`)
     }
 
+    // Load reference images from recipe (e.g. freeform chat reference images)
+    const referenceImages: ReferenceImageInput[] = []
+    const recipeReferenceImages = version.recipe.settings.referenceImages as Array<{ path?: string; role?: string }> | undefined
+    console.log(`[GenerateService] 🖼️  Native 4K: Checking for reference image(s) in recipe...`)
+    if (Array.isArray(recipeReferenceImages) && recipeReferenceImages.length > 0) {
+      console.log(`[GenerateService] 📚 Native 4K: Found ${recipeReferenceImages.length} reference image(s)`)
+      for (const [index, ref] of recipeReferenceImages.entries()) {
+        if (!ref?.path) continue
+        const role = ref.role || `reference image ${index + 1}`
+        const refImage = await loadReferenceImage(ref.path, role)
+        if (refImage) {
+          referenceImages.push(refImage)
+          console.log(`[GenerateService] ✅ Native 4K: Ref ${index + 1} LOADED (${(refImage.imageData.length / 1024).toFixed(1)}KB)`)
+        } else {
+          console.warn(`[GenerateService] ❌ Native 4K: Ref ${index + 1} FAILED to load from ${ref.path}`)
+        }
+      }
+    } else {
+      console.log(`[GenerateService] ℹ️  Native 4K: No reference images in recipe`)
+    }
+
     const selectionCount = 1
     const { provider, resolved } = await getResolvedImageProvider(model)
     const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
@@ -847,7 +1039,8 @@ export async function generateVersionNative4K(
       imageSize: '4K',
       aspectRatio,
       seed,
-      priorityMode: false
+      priorityMode: false,
+      referenceImages: referenceImages.length > 0 ? referenceImages : undefined
     })
 
     onProgress?.(80)
@@ -968,6 +1161,7 @@ export async function generateVersionNative4K(
     console.error('[GenerateService] Native 4K error:', errorMessage)
     await setVersionGenerationStatus(jobId, versionId, 'failed', errorMessage)
     await setVersionStatus(jobId, versionId, 'error', errorMessage)
+    onProgress?.(100) // Always notify renderer so tile updates to error state
     return {
       success: false,
       error: errorMessage

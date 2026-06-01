@@ -8,6 +8,7 @@ export type FinalModel = 'gemini-3-pro-image-preview'
 export type SeedStrategy = 'randomPerImage' | 'fixedPerRun'
 export type LightingCondition = 'overcast' | 'sunny'
 export type ImageProvider = 'google' | 'openrouter'
+export type PromptStyle = 'full' | 'simplified'
 
 export interface Settings {
   keepExif: boolean
@@ -31,6 +32,22 @@ export interface Settings {
   previewPriorityMode: boolean
   advancedCustomModel: string
   
+  // Prompt style: 'full' uses detailed prompts with all guardrails, 'simplified' uses concise prompts
+  promptStyle: PromptStyle
+
+  // Auto-evaluation: score generated images and optionally retry low-quality results
+  evaluationEnabled: boolean
+  evaluationThreshold: number   // Min overall score (1-10) to accept without retry
+  evaluationMaxRetries: number  // Max additional attempts if score is below threshold
+  // 'auto_retry': retry automatically if below threshold (original behaviour)
+  // 'flag_for_review': flag the version for user review instead of auto-retrying
+  evaluationReviewMode: 'auto_retry' | 'flag_for_review'
+
+  // Watch folder: auto-import new images from a configured directory
+  watchFolderEnabled: boolean
+  watchFolderPath: string | null
+  watchFolderJobId: string | null
+
   // Privacy settings
   privacy: {
     safeFilenamesOnImport: boolean
@@ -59,6 +76,20 @@ const DEFAULT_SETTINGS: Settings = {
   previewPriorityMode: true,
   advancedCustomModel: '',
   
+  // Prompt style
+  promptStyle: 'full' as PromptStyle,
+
+  // Auto-evaluation
+  evaluationEnabled: false,
+  evaluationThreshold: 7,
+  evaluationMaxRetries: 1,
+  evaluationReviewMode: 'flag_for_review' as const,
+
+  // Watch folder
+  watchFolderEnabled: false,
+  watchFolderPath: null,
+  watchFolderJobId: null,
+
   // Privacy settings
   privacy: {
     safeFilenamesOnImport: true
