@@ -24,15 +24,8 @@ interface GenerationControlFooterProps {
  * NO MODULE MAY BYPASS THIS COMPONENT.
  */
 export function GenerationControlFooter({ module }: GenerationControlFooterProps) {
-  console.log(`[GenerationControlFooter] Rendering for module: ${module}`)
-  
   return (
-    <div className="space-y-6 border-t-4 border-amber-500 pt-6 mt-6 bg-slate-800/30">
-      {/* DEBUG: Visible marker */}
-      <div className="text-xs text-amber-400 font-mono">
-        ⚠️ GENERATION CONTROL FOOTER - Module: {module}
-      </div>
-      
+    <div className="space-y-6 border-t-2 border-slate-600 pt-6 mt-6">
       {/* Custom Instructions - Always visible, always editable */}
       <CustomInstructions module={module} />
       

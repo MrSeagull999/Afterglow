@@ -511,6 +511,16 @@ export function ModuleGridTile({
                   </button>
                 )}
 
+                {latestVersion.outputPath && (
+                  <button
+                    onClick={handleCompare}
+                    className="p-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+                    title="Preview"
+                  >
+                    <Eye className="w-3 h-3" />
+                  </button>
+                )}
+
                 {currentStatus === 'approved' && (
                   <button
                     onClick={handleGenerateFinal}
