@@ -136,17 +136,6 @@ export function JobPage() {
     return off
   }, [currentJob?.id])
 
-  const applyTargetLabel = (() => {
-    const count = selectedAssetIds.size
-    if (count === 0) return 'Applying to: (none)'
-    if (count > 1) return 'Applying to: Original source images'
-
-    const assetId = Array.from(selectedAssetIds)[0]
-    const viewed = getViewedVersionId(assetId)
-    if (!viewed) return 'Applying to: Original'
-    return `Applying to: Version ${viewed}`
-  })()
-
   // Load injectors/guardrails when module changes
   useEffect(() => {
     if (activeModule) {
@@ -171,7 +160,13 @@ export function JobPage() {
     }
   }
 
-  const handleApplyToSelected = async () => {
+  const TIER = {
+    preview: { channel: 'batchGenerate', label: '' },
+    hq_preview: { channel: 'batchGenerateHQ', label: 'HQ ' },
+    native_4k: { channel: 'batchGenerateNative4K', label: 'Native 4K ' }
+  } as const
+
+  const runBatchGeneration = async (tier: keyof typeof TIER) => {
     if (!currentJob || !activeModule || selectedAssetIds.size === 0) {
       addToast('Select images first', 'error')
       return
@@ -225,6 +220,9 @@ export function JobPage() {
         assetIds,
         sourceVersionIdByAssetId
       }
+      if (tier !== 'preview') {
+        baseParams.qualityTier = tier
+      }
 
       if (activeModule === 'twilight') {
         const presets = await window.electronAPI.getPresets()
@@ -265,6 +263,10 @@ export function JobPage() {
         baseParams.roomDimensions = stagingSettings.roomDimensions
         baseParams.injectorIds = Array.from(selectedInjectorIds)
         baseParams.guardrailIds = Array.from(selectedGuardrailIds)
+        if (tier !== 'preview') {
+          baseParams.enableSceneMode = stagingSettings.enableSceneMode
+          baseParams.isMasterView = stagingSettings.isMasterView
+        }
       }
 
       if (activeModule === 'renovate') {
@@ -285,7 +287,7 @@ export function JobPage() {
         baseParams.customInstructions = freeformSettings.customInstructions
       }
 
-      const results = await window.api.invoke(`module:${activeModule}:batchGenerate`, baseParams)
+      const results = await window.api.invoke(`module:${activeModule}:${TIER[tier].channel}`, baseParams)
 
       const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
 
@@ -322,330 +324,15 @@ export function JobPage() {
         setViewedVersionId
       })
 
-      addToast(`Started ${activeModule} generation for ${assetIds.length} images`, 'success')
+      addToast(`Started ${TIER[tier].label}${activeModule} generation for ${assetIds.length} images`, 'success')
     } catch (error) {
       console.error('Batch generation failed:', error)
-      addToast('Failed to start generation', 'error')
+      addToast(`Failed to start ${TIER[tier].label}generation`, 'error')
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const handleApplyHQToSelected = async () => {
-    if (!currentJob || !activeModule || selectedAssetIds.size === 0) {
-      addToast('Select images first', 'error')
-      return
-    }
-
-    setIsGenerating(true)
-    try {
-      const assetIds = Array.from(selectedAssetIds)
-
-      // Determine per-asset source version mapping
-      const sourceVersionIdByAssetId: Record<string, string> = {}
-      if (assetIds.length === 1) {
-        const assetId = assetIds[0]
-        const viewed = getViewedVersionId(assetId)
-        if (viewed) {
-          sourceVersionIdByAssetId[assetId] = viewed
-        } else {
-          if (activeModule === 'stage' || activeModule === 'renovate') {
-            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
-          }
-        }
-      } else {
-        for (const assetId of assetIds) {
-          await loadVersionsForAsset(currentJob.id, assetId)
-          if (activeModule === 'stage' || activeModule === 'renovate') {
-            // For staging/renovate: source should be empty-room input.
-            // Prefer latest ready clean-slate output, else fall back to original.
-            const versions = useJobStore.getState().versionsByAssetId[assetId] || []
-            const cleanSlateVersion = versions
-              .filter(v => v.module === 'clean' && (v.status === 'hq_ready' || v.status === 'approved' || v.status === 'final_ready'))
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-
-            if (cleanSlateVersion?.id) {
-              sourceVersionIdByAssetId[assetId] = cleanSlateVersion.id
-            } else {
-              sourceVersionIdByAssetId[assetId] = `original:${assetId}`
-            }
-          } else {
-            const latest = getAssetLatestVersion(assetId)
-            if (latest?.id) {
-              sourceVersionIdByAssetId[assetId] = latest.id
-            }
-          }
-        }
-      }
-      
-      const baseParams: any = {
-        jobId: currentJob.id,
-        assetIds,
-        sourceVersionIdByAssetId,
-        qualityTier: 'hq_preview'  // Signal HQ preview generation
-      }
-
-      if (activeModule === 'twilight') {
-        const presets = await window.electronAPI.getPresets()
-        const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
-        baseParams.presetId = twilightSettings.presetId
-        baseParams.promptTemplate = preset?.promptTemplate || ''
-        baseParams.lightingCondition = twilightSettings.lightingCondition
-        baseParams.customInstructions = twilightSettings.customInstructions
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        if (twilightSettings.referenceImageId) {
-          const refImage = await window.electronAPI.getReferenceImage('twilight', twilightSettings.referenceImageId)
-          if (refImage?.imagePath) {
-            baseParams.referenceImagePath = refImage.imagePath
-          }
-        }
-      }
-
-      if (activeModule === 'relight') {
-        const presets = await window.electronAPI.getRelightPresets()
-        const preset = presets.find((p: any) => p.id === relightSettings.presetId)
-        baseParams.presetId = relightSettings.presetId
-        baseParams.promptTemplate = preset?.promptTemplate || ''
-        baseParams.customInstructions = relightSettings.customInstructions
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        if (relightSettings.referenceImageId) {
-          const refImage = await window.electronAPI.getReferenceImage('relight', relightSettings.referenceImageId)
-          if (refImage?.imagePath) {
-            baseParams.referenceImagePath = refImage.imagePath
-          }
-        }
-      }
-
-      if (activeModule === 'stage') {
-        baseParams.roomType = stagingSettings.roomType
-        baseParams.style = stagingSettings.style
-        baseParams.roomDimensions = stagingSettings.roomDimensions
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        baseParams.enableSceneMode = stagingSettings.enableSceneMode
-        baseParams.isMasterView = stagingSettings.isMasterView
-      }
-
-      if (activeModule === 'renovate') {
-        baseParams.changes = renovateSettings.changes
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-      }
-
-      if (activeModule === 'clean') {
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-      }
-
-      if (activeModule === 'freeform') {
-        baseParams.craftedPrompt = freeformSettings.craftedPrompt
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        baseParams.customInstructions = freeformSettings.customInstructions
-      }
-
-      const results = await window.api.invoke(`module:${activeModule}:batchGenerateHQ`, baseParams)
-
-      const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
-
-      for (const assetId of assetIds) {
-        const createdId = createdVersionIdsByAssetId[assetId]
-        if (!createdId) continue
-        const sourceId = sourceVersionIdByAssetId[assetId]
-        const sourceVersionIds = sourceId ? [sourceId] : []
-        const pending = useJobStore.getState().createOptimisticPendingVersion({
-          jobId: currentJob.id,
-          assetId,
-          versionId: createdId,
-          module: activeModule,
-          sourceVersionIds
-        })
-        useJobStore.getState().upsertVersionForAsset(assetId, pending)
-        setViewedVersionId(assetId, createdId)
-      }
-
-      useJobStore.getState().startBatchRun({
-        moduleId: activeModule,
-        assetIds,
-        createdVersionIdsByAssetId,
-        failedAssetIds
-      })
-
-      applyBatchGenerationResults({
-        assetIds,
-        results,
-        setLastAppliedVersionId,
-        setViewedVersionId
-      })
-
-      addToast(`Started HQ ${activeModule} generation for ${assetIds.length} images`, 'success')
-    } catch (error) {
-      console.error('HQ Batch generation failed:', error)
-      addToast('Failed to start HQ generation', 'error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const handleApplyNative4KToSelected = async () => {
-    if (!currentJob || !activeModule || selectedAssetIds.size === 0) {
-      addToast('Select images first', 'error')
-      return
-    }
-
-    setIsGenerating(true)
-    try {
-      const assetIds = Array.from(selectedAssetIds)
-
-      // Determine per-asset source version mapping
-      const sourceVersionIdByAssetId: Record<string, string> = {}
-      if (assetIds.length === 1) {
-        const assetId = assetIds[0]
-        const viewed = getViewedVersionId(assetId)
-        if (viewed) {
-          sourceVersionIdByAssetId[assetId] = viewed
-        } else {
-          if (activeModule === 'stage' || activeModule === 'renovate') {
-            sourceVersionIdByAssetId[assetId] = `original:${assetId}`
-          }
-        }
-      } else {
-        for (const assetId of assetIds) {
-          await loadVersionsForAsset(currentJob.id, assetId)
-          if (activeModule === 'stage' || activeModule === 'renovate') {
-            // For staging/renovate: source should be empty-room input.
-            // Prefer latest ready clean-slate output, else fall back to original.
-            const versions = useJobStore.getState().versionsByAssetId[assetId] || []
-            const cleanSlateVersion = versions
-              .filter(v => v.module === 'clean' && (v.status === 'hq_ready' || v.status === 'approved' || v.status === 'final_ready'))
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-
-            if (cleanSlateVersion?.id) {
-              sourceVersionIdByAssetId[assetId] = cleanSlateVersion.id
-            } else {
-              sourceVersionIdByAssetId[assetId] = `original:${assetId}`
-            }
-          } else {
-            const latest = getAssetLatestVersion(assetId)
-            if (latest?.id) {
-              sourceVersionIdByAssetId[assetId] = latest.id
-            }
-          }
-        }
-      }
-
-      const baseParams: any = {
-        jobId: currentJob.id,
-        assetIds,
-        sourceVersionIdByAssetId,
-        qualityTier: 'native_4k'  // Signal Native 4K generation
-      }
-
-      if (activeModule === 'twilight') {
-        const presets = await window.electronAPI.getPresets()
-        const preset = presets.find((p: any) => p.id === twilightSettings.presetId)
-        baseParams.presetId = twilightSettings.presetId
-        baseParams.promptTemplate = preset?.promptTemplate || ''
-        baseParams.lightingCondition = twilightSettings.lightingCondition
-        baseParams.customInstructions = twilightSettings.customInstructions
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        if (twilightSettings.referenceImageId) {
-          const refImage = await window.electronAPI.getReferenceImage('twilight', twilightSettings.referenceImageId)
-          if (refImage?.imagePath) {
-            baseParams.referenceImagePath = refImage.imagePath
-          }
-        }
-      }
-
-      if (activeModule === 'relight') {
-        const presets = await window.electronAPI.getRelightPresets()
-        const preset = presets.find((p: any) => p.id === relightSettings.presetId)
-        baseParams.presetId = relightSettings.presetId
-        baseParams.promptTemplate = preset?.promptTemplate || ''
-        baseParams.customInstructions = relightSettings.customInstructions
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        if (relightSettings.referenceImageId) {
-          const refImage = await window.electronAPI.getReferenceImage('relight', relightSettings.referenceImageId)
-          if (refImage?.imagePath) {
-            baseParams.referenceImagePath = refImage.imagePath
-          }
-        }
-      }
-
-      if (activeModule === 'stage') {
-        baseParams.roomType = stagingSettings.roomType
-        baseParams.style = stagingSettings.style
-        baseParams.roomDimensions = stagingSettings.roomDimensions
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        baseParams.enableSceneMode = stagingSettings.enableSceneMode
-        baseParams.isMasterView = stagingSettings.isMasterView
-      }
-
-      if (activeModule === 'renovate') {
-        baseParams.changes = renovateSettings.changes
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-      }
-
-      if (activeModule === 'clean') {
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-      }
-
-      if (activeModule === 'freeform') {
-        baseParams.craftedPrompt = freeformSettings.craftedPrompt
-        baseParams.injectorIds = Array.from(selectedInjectorIds)
-        baseParams.guardrailIds = Array.from(selectedGuardrailIds)
-        baseParams.customInstructions = freeformSettings.customInstructions
-      }
-
-      const results = await window.api.invoke(`module:${activeModule}:batchGenerateNative4K`, baseParams)
-
-      const { createdVersionIdsByAssetId, failedAssetIds } = getBatchRunMappingFromResults(results)
-
-      for (const assetId of assetIds) {
-        const createdId = createdVersionIdsByAssetId[assetId]
-        if (!createdId) continue
-        const sourceId = sourceVersionIdByAssetId[assetId]
-        const sourceVersionIds = sourceId ? [sourceId] : []
-        const pending = useJobStore.getState().createOptimisticPendingVersion({
-          jobId: currentJob.id,
-          assetId,
-          versionId: createdId,
-          module: activeModule,
-          sourceVersionIds
-        })
-        useJobStore.getState().upsertVersionForAsset(assetId, pending)
-        setViewedVersionId(assetId, createdId)
-      }
-
-      useJobStore.getState().startBatchRun({
-        moduleId: activeModule,
-        assetIds,
-        createdVersionIdsByAssetId,
-        failedAssetIds
-      })
-
-      applyBatchGenerationResults({
-        assetIds,
-        results,
-        setLastAppliedVersionId,
-        setViewedVersionId
-      })
-
-      addToast(`Started Native 4K ${activeModule} generation for ${assetIds.length} images`, 'success')
-    } catch (error) {
-      console.error('Native 4K Batch generation failed:', error)
-      addToast('Failed to start Native 4K generation', 'error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
 
   if (!currentJob) {
     return (
@@ -743,10 +430,9 @@ export function JobPage() {
             activeModule={activeModule}
             selectedAssetIds={Array.from(selectedAssetIds)}
             assets={assets}
-            applyTargetLabel={applyTargetLabel}
-            onApply={handleApplyToSelected}
-            onApplyHQ={handleApplyHQToSelected}
-            onApplyNative4K={handleApplyNative4KToSelected}
+            onApply={() => runBatchGeneration('preview')}
+            onApplyHQ={() => runBatchGeneration('hq_preview')}
+            onApplyNative4K={() => runBatchGeneration('native_4k')}
           />
         }
       />

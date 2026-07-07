@@ -1,9 +1,14 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { app } from 'electron'
 
-const PRESETS_PATH = './prompt-bank/presets.json'
-const RELIGHT_PRESETS_PATH = './prompt-bank/relight-presets.json'
+// Packaged: prompt-bank ships in Contents/Resources; dev: project root
+const promptBankDir = app.isPackaged
+  ? join(process.resourcesPath, 'prompt-bank')
+  : join(app.getAppPath(), 'prompt-bank')
+const PRESETS_PATH = join(promptBankDir, 'presets.json')
+const RELIGHT_PRESETS_PATH = join(promptBankDir, 'relight-presets.json')
 
 export interface PresetSettings {
   previewWidth: number

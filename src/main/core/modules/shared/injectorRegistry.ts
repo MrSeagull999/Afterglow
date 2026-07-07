@@ -1,9 +1,12 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { app } from 'electron'
 import type { Injector, ModuleType } from '../../../../shared/types'
 
-const INJECTORS_DIR = join(process.cwd(), 'prompt-bank', 'injectors')
+const INJECTORS_DIR = app.isPackaged
+  ? join(process.resourcesPath, 'prompt-bank', 'injectors')
+  : join(app.getAppPath(), 'prompt-bank', 'injectors')
 
 let injectorCache: Map<ModuleType, Injector[]> = new Map()
 

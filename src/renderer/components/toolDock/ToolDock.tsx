@@ -7,7 +7,7 @@ export interface ToolDockProps {
   onSelectModule: (module: ModuleType) => void
 }
 
-const TOOLS: { id: ModuleType; label: string; icon: React.ReactNode; color: string }[] = [
+const ALL_TOOLS: { id: ModuleType; label: string; icon: React.ReactNode; color: string }[] = [
   { id: 'twilight', label: 'Twilight', icon: <Moon className="w-4 h-4" />, color: 'text-indigo-400' },
   { id: 'relight', label: 'ReLight', icon: <Lightbulb className="w-4 h-4" />, color: 'text-amber-400' },
   { id: 'clean', label: 'Clean Slate', icon: <Eraser className="w-4 h-4" />, color: 'text-emerald-400' },
@@ -16,6 +16,12 @@ const TOOLS: { id: ModuleType; label: string; icon: React.ReactNode; color: stri
   { id: 'freeform', label: 'Freeform', icon: <MessageSquare className="w-4 h-4" />, color: 'text-cyan-400' },
   { id: 'sky', label: 'Sky', icon: <Cloud className="w-4 h-4" />, color: 'text-sky-400' }
 ]
+
+// Freeform's AI-crafted prompts have replaced the preset modules; their code
+// remains, so add an id back here to resurface a tool in the dock.
+const VISIBLE_TOOL_IDS: ModuleType[] = ['freeform', 'sky']
+
+const TOOLS = ALL_TOOLS.filter((t) => VISIBLE_TOOL_IDS.includes(t.id))
 
 export function ToolDock({ activeModule, onSelectModule }: ToolDockProps) {
   return (

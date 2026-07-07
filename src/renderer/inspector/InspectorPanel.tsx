@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { Asset, ModuleType } from '../../shared/types'
-import { CostEstimateDisplay, SingleGenerationCostBadge } from '../components/CostEstimateDisplay'
 import { TwilightSettings } from '../components/modules/settings/TwilightSettings'
 import { CleanSlateSettings } from '../components/modules/settings/CleanSlateSettings'
 import { StagingSettings } from '../components/modules/settings/StagingSettings'
@@ -18,7 +17,6 @@ export interface InspectorPanelProps {
   activeModule: ModuleType | null
   selectedAssetIds: string[]
   assets: Asset[]
-  applyTargetLabel?: string
   onApply: () => void
   onApplyHQ?: () => void
   onApplyNative4K?: () => void
@@ -440,24 +438,10 @@ export function InspectorPanel(props: InspectorPanelProps) {
           )}
         </section>
 
-        {/* 7) Cost Reference */}
-        <section data-testid="section-cost" className="p-4 bg-slate-900 border border-slate-700 rounded-lg space-y-2 min-w-0">
-          <div className="text-[11px] tracking-wide text-slate-200 font-semibold">COST REFERENCE</div>
-          <CostEstimateDisplay 
-            showPerImageCosts={true}
-            previewCount={selectionCount > 0 ? selectionCount : 0}
-          />
-        </section>
       </div>
 
       {/* 7) Primary Action — hidden for Sky (has its own Generate button in SkyPanel) */}
       {props.activeModule !== 'sky' && <div data-testid="section-primary-action" className="flex-shrink-0 p-4 border-t border-slate-700 bg-slate-800/80">
-        {props.applyTargetLabel && (
-          <div className="text-xs text-slate-400 mb-2" data-testid="apply-target-label">
-            {props.applyTargetLabel}
-          </div>
-        )}
-
         {/* Generation Buttons - Preview, HQ Preview, and Native 4K */}
         <div className="flex gap-2 mb-3">
           <button
@@ -465,10 +449,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
             onClick={props.onApply}
             disabled={isApplyDisabled}
             className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
-            title="Generate quick preview (~$0.04/image)"
+            title="Generate quick preview"
           >
             <div className="text-sm font-medium">Preview</div>
-            <div className="text-xs text-blue-200">~$0.04</div>
           </button>
 
           <button
@@ -476,10 +459,9 @@ export function InspectorPanel(props: InspectorPanelProps) {
             onClick={props.onApplyHQ}
             disabled={isApplyDisabled || !props.onApplyHQ}
             className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
-            title="Generate HQ preview with Nano Banana Pro 2K (~$0.13/image) - preview what 4K will look like"
+            title="Generate HQ preview with Nano Banana Pro 2K - preview what 4K will look like"
           >
             <div className="text-sm font-medium">HQ Preview (2K)</div>
-            <div className="text-xs text-purple-200">~$0.13</div>
           </button>
 
           <button
@@ -490,7 +472,6 @@ export function InspectorPanel(props: InspectorPanelProps) {
             title="Generate true 4K version (3840×2160) directly - skip preview if you trust your prompt"
           >
             <div className="text-sm font-medium">Native 4K</div>
-            <div className="text-xs text-amber-200">~$0.24</div>
           </button>
         </div>
 
@@ -517,8 +498,7 @@ export function InspectorPanel(props: InspectorPanelProps) {
                 className="flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-amber-600 hover:bg-amber-700 text-white"
                 title="Generate true 4K version (3840×2160) using native model resolution"
               >
-                <div className="text-sm font-medium">Generate 4K</div>
-                <div className="text-xs text-amber-200">~$0.24</div>
+                Generate 4K
               </button>
             )}
           </div>

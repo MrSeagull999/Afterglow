@@ -1,7 +1,16 @@
 import { readFile, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
+import { join } from 'path'
+import { app } from 'electron'
 
-const SETTINGS_PATH = './afterglow-settings.json'
+// Packaged: cwd is / (unwritable), so settings live in userData; dev keeps
+// the project-root file it always used. Resolved lazily — `app` only exists
+// inside Electron, and module-scope access breaks the node:test suite.
+function getSettingsPath(): string {
+  return app.isPackaged
+    ? join(app.getPath('userData'), 'afterglow-settings.json')
+    : join(app.getAppPath(), 'afterglow-settings.json')
+}
 
 export type PreviewModel = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'
 export type FinalModel = 'gemini-3-pro-image-preview'
@@ -101,14 +110,14 @@ let cachedSettings: Settings | null = null
 export async function getSettings(): Promise<Settings> {
   if (cachedSettings) return cachedSettings
   
-  if (!existsSync(SETTINGS_PATH)) {
+  if (!existsSync(getSettingsPath())) {
     cachedSettings = { ...DEFAULT_SETTINGS }
     await saveSettings(cachedSettings)
     return cachedSettings
   }
-  
+
   try {
-    const data = await readFile(SETTINGS_PATH, 'utf-8')
+    const data = await readFile(getSettingsPath(), 'utf-8')
     cachedSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) }
     return cachedSettings!
   } catch {
@@ -125,7 +134,7 @@ export async function updateSettings(updates: Partial<Settings>): Promise<Settin
 }
 
 async function saveSettings(settings: Settings): Promise<void> {
-  await writeFile(SETTINGS_PATH, JSON.stringify(settings, null, 2))
+  await writeFile(getSettingsPath(), JSON.stringify(settings, null, 2))
 }
 
 export function clearSettingsCache(): void {

@@ -36,3 +36,6 @@ jobs/
 
 # macOS resource forks (created during HDD recovery)
 ._*
+
+# App icon intermediate (icon.icns is generated from icon.svg via icon.iconset)
+build/icon.iconset/

@@ -22,7 +22,7 @@ export function ThreeColumnLayout({ left, center, right }: ThreeColumnLayoutProp
 
       <aside
         data-testid="inspector-panel"
-        className="w-[clamp(320px,28vw,460px)] min-w-[320px] max-w-[460px] flex-shrink-0 border-l border-slate-700 flex flex-col bg-slate-800/30 min-w-0"
+        className="w-[clamp(360px,32vw,620px)] min-w-[360px] max-w-[620px] flex-shrink-0 border-l border-slate-700 flex flex-col bg-slate-800/30 min-w-0"
       >
         {right}
       </aside>

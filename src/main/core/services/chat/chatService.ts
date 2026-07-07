@@ -1,4 +1,4 @@
-import { readFile, mkdir, writeFile } from 'fs/promises'
+import { readFile, mkdir, writeFile, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import sharp from 'sharp'
@@ -30,6 +30,7 @@ export interface ChatSession {
   assetId: string
   messages: ChatMessage[]
   suggestedPrompt: string | null
+  craftedPrompt: string
   imageBase64?: string
   imageMimeType?: string
   /** Paths to reference images saved to disk during this session (for generation) */
@@ -43,8 +44,53 @@ export interface ChatResponse {
   error?: string
 }
 
-// In-memory session store (ephemeral, no persistence needed)
+// In-memory session store, mirrored to disk per asset so chats survive restarts
 const chatSessions = new Map<string, ChatSession>()
+
+// Conversation state persisted per asset (imageBase64 is rebuilt from the
+// asset on restore, so it is deliberately excluded)
+interface PersistedChatSession {
+  messages: ChatMessage[]
+  suggestedPrompt: string | null
+  craftedPrompt: string
+  referenceImagePaths: string[]
+}
+
+function sessionFilePath(jobId: string, assetId: string): string {
+  return join(getJobDirectory(jobId), 'chat-sessions', `${assetId}.json`)
+}
+
+async function persistSession(session: ChatSession): Promise<void> {
+  try {
+    await mkdir(join(getJobDirectory(session.jobId), 'chat-sessions'), { recursive: true })
+    const data: PersistedChatSession = {
+      messages: session.messages,
+      suggestedPrompt: session.suggestedPrompt,
+      craftedPrompt: session.craftedPrompt,
+      referenceImagePaths: session.referenceImagePaths
+    }
+    await writeFile(sessionFilePath(session.jobId, session.assetId), JSON.stringify(data))
+  } catch (err: any) {
+    console.error('[ChatService] Failed to persist session:', err.message)
+  }
+}
+
+async function loadPersistedSession(jobId: string, assetId: string): Promise<PersistedChatSession | null> {
+  try {
+    const filePath = sessionFilePath(jobId, assetId)
+    if (!existsSync(filePath)) return null
+    const data = JSON.parse(await readFile(filePath, 'utf-8'))
+    return {
+      messages: Array.isArray(data.messages) ? data.messages : [],
+      suggestedPrompt: typeof data.suggestedPrompt === 'string' ? data.suggestedPrompt : null,
+      craftedPrompt: typeof data.craftedPrompt === 'string' ? data.craftedPrompt : '',
+      referenceImagePaths: Array.isArray(data.referenceImagePaths) ? data.referenceImagePaths : []
+    }
+  } catch (err: any) {
+    console.error('[ChatService] Failed to load persisted session:', err.message)
+    return null
+  }
+}
 
 const SYSTEM_PROMPT = `You are an AI assistant helping a user craft an image editing prompt for a real estate photograph.
 
@@ -333,19 +379,23 @@ export async function createChatSession(jobId: string, assetId: string): Promise
     }
   }
 
+  // Restore a previous conversation for this asset if one was persisted
+  const persisted = await loadPersistedSession(jobId, assetId)
+
   const session: ChatSession = {
     id: sessionId,
     jobId,
     assetId,
-    messages: [],
-    suggestedPrompt: null,
+    messages: persisted?.messages || [],
+    suggestedPrompt: persisted?.suggestedPrompt || null,
+    craftedPrompt: persisted?.craftedPrompt || '',
     imageBase64,
     imageMimeType,
-    referenceImagePaths: []
+    referenceImagePaths: persisted?.referenceImagePaths || []
   }
 
   chatSessions.set(sessionId, session)
-  console.log(`[ChatService] Created session ${sessionId} for asset ${assetId}`)
+  console.log(`[ChatService] Created session ${sessionId} for asset ${assetId}${persisted ? ` (restored ${persisted.messages.length} messages)` : ''}`)
 
   return session
 }
@@ -441,11 +491,23 @@ export async function sendChatMessage(
   const suggestedPrompt = extractPrompt(responseText)
   session.suggestedPrompt = suggestedPrompt
 
+  await persistSession(session)
+
   return {
     success: true,
     message: responseText,
     suggestedPrompt
   }
+}
+
+/**
+ * Store the user's crafted prompt on the session and persist it.
+ */
+export async function setChatCraftedPrompt(sessionId: string, prompt: string): Promise<void> {
+  const session = chatSessions.get(sessionId)
+  if (!session) return
+  session.craftedPrompt = prompt
+  await persistSession(session)
 }
 
 /**
@@ -456,10 +518,14 @@ export function getChatSession(sessionId: string): ChatSession | null {
 }
 
 /**
- * Clear a chat session.
+ * Clear a chat session, including its persisted copy on disk.
  */
-export function clearChatSession(sessionId: string): void {
+export async function clearChatSession(sessionId: string): Promise<void> {
+  const session = chatSessions.get(sessionId)
   chatSessions.delete(sessionId)
+  if (session) {
+    await rm(sessionFilePath(session.jobId, session.assetId), { force: true }).catch(() => undefined)
+  }
   console.log(`[ChatService] Cleared session ${sessionId}`)
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAppStore } from './store/useAppStore'
 import { useModuleStore } from './store/useModuleStore'
 import { TopBar } from './components/TopBar'
@@ -8,11 +8,27 @@ import { JobsHome } from './pages/JobsHome'
 import { JobPage } from './pages/JobPage'
 import { FlipCompareModal } from './components/FlipCompareModal'
 import { SettingsModal } from './components/SettingsModal'
+import { ImportFilesModal } from './components/ImportFilesModal'
 import { Toasts } from './components/Toasts'
 
 export default function App() {
   const { view, setPresets, setSettings, setRuns, addToast } = useAppStore()
   const { loadConstants } = useModuleStore()
+  const [incomingFiles, setIncomingFiles] = useState<string[]>([])
+
+  // Files opened via Finder / Lightroom "Edit In" — drain main's pending
+  // queue on mount, then again whenever main pings that more arrived.
+  useEffect(() => {
+    const pullPending = async () => {
+      const files: string[] = await window.api.invoke('openFiles:getPending')
+      if (files.length > 0) {
+        setIncomingFiles((prev) => [...prev, ...files.filter((f) => !prev.includes(f))])
+      }
+    }
+    pullPending()
+    const off = window.api.on('openFiles:pending', pullPending)
+    return off
+  }, [])
 
   useEffect(() => {
     async function init() {
@@ -47,6 +63,9 @@ export default function App() {
       </main>
       <FlipCompareModal />
       <SettingsModal />
+      {incomingFiles.length > 0 && (
+        <ImportFilesModal filePaths={incomingFiles} onClose={() => setIncomingFiles([])} />
+      )}
       <Toasts />
     </div>
   )

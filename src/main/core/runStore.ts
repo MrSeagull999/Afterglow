@@ -1,8 +1,11 @@
 import { readFile, writeFile, mkdir, readdir } from 'fs/promises'
 import { join, basename } from 'path'
 import { existsSync } from 'fs'
+import { app } from 'electron'
 
-const RUNS_DIR = process.env.RUNS_DIR || './runs'
+const RUNS_DIR =
+  process.env.RUNS_DIR ||
+  (app.isPackaged ? join(app.getPath('userData'), 'runs') : join(app.getAppPath(), 'runs'))
 
 export type ImageStatus = 
   | 'pending'

@@ -61,6 +61,20 @@ interface ChatState {
   setIsDragging: (dragging: boolean) => void
 }
 
+// Debounce disk writes while the user types in the crafted-prompt textarea
+let craftedPromptSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+function persistCraftedPrompt(sessionId: string, prompt: string, immediate = false) {
+  if (craftedPromptSaveTimer) clearTimeout(craftedPromptSaveTimer)
+  if (immediate) {
+    window.api.invoke('chat:setCraftedPrompt', sessionId, prompt).catch(console.error)
+    return
+  }
+  craftedPromptSaveTimer = setTimeout(() => {
+    window.api.invoke('chat:setCraftedPrompt', sessionId, prompt).catch(console.error)
+  }, 600)
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: new Map(),
   pendingImages: [],
@@ -85,12 +99,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         throw new Error('Failed to create chat session')
       }
 
+      // Main restores any persisted conversation for this asset
       const session: ChatSession = {
         sessionId: response.id,
         assetId,
-        messages: [],
-        suggestedPrompt: null,
-        craftedPrompt: ''
+        messages: response.messages || [],
+        suggestedPrompt: response.suggestedPrompt || null,
+        craftedPrompt: response.craftedPrompt || ''
       }
 
       const newSessions = new Map(get().sessions)
@@ -184,6 +199,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Also update module store
     useModuleStore.getState().setFreeformCraftedPrompt(prompt)
+    persistCraftedPrompt(session.sessionId, prompt, true)
   },
 
   setCraftedPrompt: (assetId: string, prompt: string) => {
@@ -197,6 +213,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Also update module store
     useModuleStore.getState().setFreeformCraftedPrompt(prompt)
+    persistCraftedPrompt(session.sessionId, prompt)
   },
 
   getCraftedPrompt: (assetId: string) => {

@@ -12,7 +12,12 @@ test('ToolDock renders outside Inspector and Inspector does not contain tool chi
   )
   assert.ok(dockHtml.includes('data-testid="tool-dock"'))
   assert.ok(dockHtml.includes('TOOLS'))
-  assert.ok(dockHtml.includes('Twilight'))
+  // Freeform-first workflow: only Freeform and Sky are surfaced; the preset
+  // modules remain in code but are hidden from the dock
+  assert.ok(dockHtml.includes('Freeform'))
+  assert.ok(dockHtml.includes('Sky'))
+  assert.ok(!dockHtml.includes('Twilight'))
+  assert.ok(!dockHtml.includes('Staging'))
 
   const inspectorHtml = renderToStaticMarkup(
     <InspectorPanel

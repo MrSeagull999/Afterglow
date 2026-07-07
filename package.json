@@ -12,6 +12,7 @@
     "start": "electron-vite preview",
     "electron:dev": "electron-vite dev",
     "electron:build": "electron-vite build && electron-builder",
+    "dist:mac": "electron-vite build && electron-builder --dir",
     "afterglow": "node ./dist/cli/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
@@ -66,13 +67,34 @@
     "appId": "com.afterglow.app",
     "productName": "AfterGlow",
     "directories": {
-      "output": "release"
+      "output": "/Users/gregwhitehead/.cache/afterglow-release"
     },
     "files": [
       "dist/**/*"
     ],
+    "extraResources": [
+      ".env",
+      "prompt-bank/**"
+    ],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.icns",
+      "extendInfo": {
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "Image",
+            "CFBundleTypeRole": "Editor",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": [
+              "public.jpeg",
+              "public.png",
+              "public.tiff",
+              "public.webp",
+              "org.webmproject.webp"
+            ]
+          }
+        ]
+      }
     }
   }
 }

@@ -72,6 +72,7 @@ import {
   sendChatMessage,
   getChatSession,
   clearChatSession,
+  setChatCraftedPrompt,
   getChatReferenceImagesForAsset,
   ChatImageAttachment
 } from '../core/services/chat/chatService'
@@ -247,7 +248,12 @@ export function registerModuleHandlers(): void {
   })
 
   ipcMain.handle('chat:clearSession', async (_event, sessionId: string) => {
-    clearChatSession(sessionId)
+    await clearChatSession(sessionId)
+    return { success: true }
+  })
+
+  ipcMain.handle('chat:setCraftedPrompt', async (_event, sessionId: string, prompt: string) => {
+    await setChatCraftedPrompt(sessionId, prompt)
     return { success: true }
   })
 
