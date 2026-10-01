@@ -38,7 +38,7 @@ export interface ExtendedCostEstimate {
 // - 1K/2K images: ~$0.134 per image (1,120 tokens × $120/1M)
 // - 4K images: ~$0.24 per image (2,000 tokens × $120/1M)
 // 
-// Current model (gemini-2.5-flash-image or similar) is cheaper:
+// Nano Banana 2 (gemini-3.1-flash-image) is cheaper:
 // - Preview: ~$0.04 per image
 // - If using Nano Banana Pro for previews: ~$0.134 per image
 const COST_PER_IMAGE = {

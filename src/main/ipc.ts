@@ -24,7 +24,15 @@ import { getSettings, updateSettings, Settings } from './core/settings'
 import { assembleTwilightPrompt, LightingCondition } from './core/lightingModifiers'
 import { registerReferenceImageHandlers } from './ipc/referenceImageHandlers'
 
-export function setupIpcHandlers(mainWindow: BrowserWindow): void {
+export function setupIpcHandlers(getMainWindow: () => BrowserWindow | null): void {
+  // Resolve the live window at send time — the window can be closed and
+  // recreated (macOS reactivate), so a captured reference goes stale.
+  const send = (channel: string, payload: unknown) => {
+    const win = getMainWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(channel, payload)
+    }
+  }
   registerReferenceImageHandlers()
   ipcMain.handle('scan:directory', async (_, dirPath: string) => {
     return scanDirectory(dirPath)
@@ -84,7 +92,7 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     console.log('[IPC] Starting preview generation:', params.imagePath)
     const result = await generatePreview(params, (progress) => {
       console.log('[IPC] Preview progress:', params.imagePath, progress + '%')
-      mainWindow.webContents.send('preview:progress', { ...params, progress })
+      send('preview:progress', { ...params, progress })
     })
     console.log('[IPC] Preview generation complete:', params.imagePath, result.success ? 'SUCCESS' : 'FAILED')
     if (!result.success) {
@@ -92,7 +100,7 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     }
     if (result.seedRejected) {
       console.log('[IPC] Seed was rejected by API')
-      mainWindow.webContents.send('seed:rejected', { runId: params.runId })
+      send('seed:rejected', { runId: params.runId })
     }
     return result
   })
@@ -102,11 +110,11 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
     images: Array<{ path: string; presetId: string }>
   }) => {
     const results = await generatePreviewBatch(params, (imagePath, progress, result) => {
-      mainWindow.webContents.send('preview:progress', { 
-        runId: params.runId, 
-        imagePath, 
+      send('preview:progress', {
+        runId: params.runId,
+        imagePath,
         progress,
-        result 
+        result
       })
     })
     return results
@@ -114,19 +122,19 @@ export function setupIpcHandlers(mainWindow: BrowserWindow): void {
 
   ipcMain.handle('batch:submit', async (_, runId: string) => {
     return submitBatch(runId, (progress) => {
-      mainWindow.webContents.send('batch:progress', { runId, progress })
+      send('batch:progress', { runId, progress })
     })
   })
 
   ipcMain.handle('batch:poll', async (_, runId: string, batchId: string) => {
     return pollBatch(runId, batchId, (status) => {
-      mainWindow.webContents.send('batch:status', { runId, batchId, status })
+      send('batch:status', { runId, batchId, status })
     })
   })
 
   ipcMain.handle('batch:fetch', async (_, runId: string, batchId: string) => {
     return fetchBatchResults(runId, batchId, (imagePath, progress) => {
-      mainWindow.webContents.send('batch:fetchProgress', { runId, imagePath, progress })
+      send('batch:fetchProgress', { runId, imagePath, progress })
     })
   })
 

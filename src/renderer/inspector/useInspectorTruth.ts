@@ -19,7 +19,7 @@ export function useInspectorTruth(params: {
 }): {
   providerDisplay: string
   resolvedProvider: {
-    provider: 'openrouter' | 'gemini'
+    provider: 'openrouter' | 'gemini' | 'kie'
     model: string
     endpointBaseUrl: string
     resolvedBy: 'ui' | 'env_override'
@@ -49,7 +49,7 @@ export function useInspectorTruth(params: {
 
   const { settings } = useAppStore()
 
-  const intendedModel = (settings.previewImageModel || settings.previewModel) as string
+  const intendedModel = ((params.moduleType === 'freeform' && settings.freeformImageModel) || settings.previewImageModel || settings.previewModel) as string
 
   const [twilightPresetTemplate, setTwilightPresetTemplate] = useState<string>('')
   const [extraInstructions, setExtraInstructionsLocal] = useState('')
@@ -63,7 +63,7 @@ export function useInspectorTruth(params: {
     })
   })
 
-  const providerDisplay = resolvedProvider.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'
+  const providerDisplay = resolvedProvider.provider === 'kie' ? 'Kie.ai' : resolvedProvider.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'
 
   useEffect(() => {
     if (!params.enabled) return

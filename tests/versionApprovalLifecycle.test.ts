@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { getApprovalInvariantUpdates, isVersionDeletionLocked } from '../src/main/core/store/versionStore'
+import { getApprovalInvariantUpdates } from '../src/main/core/store/versionStore'
 
 function v(partial: any) {
   return {
@@ -46,11 +46,4 @@ test('Approving sets lifecycleStatus=approved and demotes previous approved to d
 
   const approvedCount = updates.filter((u) => u.updates.lifecycleStatus === 'approved').length
   assert.equal(approvedCount, 1)
-})
-
-test('Approved versions are locked from deletion (lifecycleStatus=approved)', () => {
-  assert.equal(isVersionDeletionLocked({ lifecycleStatus: 'approved', status: 'preview_ready' } as any), true)
-  assert.equal(isVersionDeletionLocked({ lifecycleStatus: 'draft', status: 'approved' } as any), true)
-  assert.equal(isVersionDeletionLocked({ lifecycleStatus: 'draft', status: 'final_ready' } as any), true)
-  assert.equal(isVersionDeletionLocked({ lifecycleStatus: 'draft', status: 'preview_ready' } as any), false)
 })

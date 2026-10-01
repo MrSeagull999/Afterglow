@@ -3,6 +3,7 @@ import { readdir } from 'fs/promises'
 import { join, extname, basename } from 'path'
 import { BrowserWindow } from 'electron'
 import { createAsset } from '../../store/assetStore'
+import { isMirroredOutputFilename } from '../sourceMirror'
 
 const SUPPORTED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.webp'])
 
@@ -31,6 +32,11 @@ function isTempFile(filename: string): boolean {
   return filename.startsWith('.') || filename.startsWith('._') || filename.endsWith('.tmp')
 }
 
+// Outputs we mirrored back into the folder must not be re-imported as new assets
+function isIgnoredFile(filename: string): boolean {
+  return isTempFile(filename) || isMirroredOutputFilename(filename)
+}
+
 async function processNewFiles(folderPath: string, jobId: string, importedFiles: Map<string, number>) {
   if (!existsSync(folderPath)) return
 
@@ -44,7 +50,7 @@ async function processNewFiles(folderPath: string, jobId: string, importedFiles:
   const newFiles: string[] = []
 
   for (const filename of entries) {
-    if (isTempFile(filename)) continue
+    if (isIgnoredFile(filename)) continue
 
     const filePath = join(folderPath, filename)
     if (!isImageFile(filePath)) continue
@@ -103,7 +109,7 @@ export function startWatching(folderPath: string, jobId: string): { success: boo
   try {
     const existing = readdirSync(folderPath)
     for (const filename of existing) {
-      if (isTempFile(filename)) continue
+      if (isIgnoredFile(filename)) continue
       const filePath = join(folderPath, filename)
       if (!isImageFile(filePath)) continue
       try {
@@ -117,7 +123,7 @@ export function startWatching(folderPath: string, jobId: string): { success: boo
   const pendingFiles = new Set<string>()
 
   const watcher = watch(folderPath, { persistent: false }, (event, filename) => {
-    if (!filename || isTempFile(filename) || !isImageFile(filename)) return
+    if (!filename || isIgnoredFile(filename) || !isImageFile(filename)) return
 
     pendingFiles.add(filename)
 

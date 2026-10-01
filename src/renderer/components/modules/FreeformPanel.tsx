@@ -4,6 +4,7 @@ import { useChatStore } from '../../store/useChatStore'
 import { useJobStore } from '../../store/useJobStore'
 import { useLibraryStore } from '../../store/useLibraryStore'
 import { useAppStore } from '../../store/useAppStore'
+import { FreeformModelSelect } from './FreeformModelSelect'
 import { BatchFreeformPanel } from './BatchFreeformPanel'
 import {
   CheckCircle2,
@@ -103,7 +104,7 @@ export function FreeformPanel(props: FreeformPanelProps = {}) {
   const handleAcceptPrompt = () => {
     if (currentSession?.suggestedPrompt && assetId) {
       acceptPrompt(assetId, currentSession.suggestedPrompt)
-      addToast('✓ Prompt ready! Edit below if needed, then use Preview or HQ Preview to generate.', 'success')
+      addToast('✓ Prompt ready! Edit below if needed, then press Generate 4K.', 'success')
     }
   }
 
@@ -192,13 +193,14 @@ export function FreeformPanel(props: FreeformPanelProps = {}) {
 
   // ── Multi-select: delegate to batch panel ────────────────────────────────
   if (selectedAssetIds.size > 1) {
-    return <BatchFreeformPanel />
+    return <><div className="p-4"><FreeformModelSelect /></div><BatchFreeformPanel /></>
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="p-4 space-y-6">
+      <FreeformModelSelect />
       {/* Description */}
       <div className="flex items-start gap-3 p-3 bg-slate-800/50 rounded-lg">
         <Info className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
@@ -446,7 +448,7 @@ export function FreeformPanel(props: FreeformPanelProps = {}) {
         <div className="flex items-start gap-3 p-3 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
           <Info className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-cyan-300">
-            Your prompt is ready! Use <strong>Preview</strong> or <strong>HQ Preview</strong> buttons below to generate your custom edit.
+            Your prompt is ready! Press <strong>Generate 4K</strong> below to generate your custom edit.
           </div>
         </div>
       )}

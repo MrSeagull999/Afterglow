@@ -19,14 +19,14 @@ function makeV(partial: any) {
   }
 }
 
-test('When approved exists, Show Current jumps to approved', () => {
+test('Show Current ignores legacy approvals and jumps to newest', () => {
   const versions = [
     makeV({ id: 'v1', createdAt: '2020-01-01T00:00:00.000Z' }),
     makeV({ id: 'v2', createdAt: '2020-01-02T00:00:00.000Z', lifecycleStatus: 'approved', status: 'approved' }),
     makeV({ id: 'v3', createdAt: '2020-01-03T00:00:00.000Z' })
   ]
 
-  assert.equal(getCurrentPreferredVersionIdForMainStage(versions as any), 'v2')
+  assert.equal(getCurrentPreferredVersionIdForMainStage(versions as any), 'v3')
 })
 
 test('When no approved, Show Current jumps to newest generated', () => {

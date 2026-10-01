@@ -64,6 +64,7 @@ export async function createAsset(params: {
     sceneId: params.sceneId,  // Can be undefined
     name: params.name || displayName,
     originalPath: finalOriginalPath,
+    sourceOriginPath: params.sourcePath,  // Lightroom-side location; versions are mirrored next to it
     versionIds: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

@@ -1,5 +1,5 @@
 import React from 'react'
-import { useAppStore, PreviewModel, SeedStrategy } from '../store/useAppStore'
+import { useAppStore, SeedStrategy } from '../store/useAppStore'
 import { X, Info } from 'lucide-react'
 import { ProviderSettings } from './settings/ProviderSettings'
 import { ReferenceImageSettings } from './settings/ReferenceImageSettings'
@@ -12,7 +12,8 @@ export function SettingsModal() {
 
   const handleSave = async () => {
     try {
-      await window.electronAPI.updateSettings(settings)
+      const saved = await window.electronAPI.updateSettings({ ...settings, imageProvider: 'google' })
+      setSettings(saved)
       addToast('Settings saved', 'success')
       closeSettingsModal()
     } catch (error) {
@@ -22,8 +23,8 @@ export function SettingsModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="relative w-full max-w-lg mx-4 bg-slate-800 rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700 sticky top-0 bg-slate-800">
+      <div className="relative w-full max-w-2xl mx-4 bg-slate-800 rounded-lg shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 shrink-0 bg-slate-800">
           <h2 className="text-lg font-medium text-white">Settings</h2>
           <button
             onClick={closeSettingsModal}
@@ -33,48 +34,15 @@ export function SettingsModal() {
           </button>
         </div>
 
-        <div className="p-4 space-y-6">
+        <div className="p-5 space-y-6 overflow-y-auto min-h-0">
           {/* Provider Settings */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">AI Provider</h3>
+            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">AI &amp; image models</h3>
             <ProviderSettings />
           </div>
 
           <div className="border-t border-slate-700 pt-4 space-y-4">
-            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">Model Settings</h3>
-            
-            <div className="space-y-2">
-              <label className="text-sm text-slate-300">Preview Model</label>
-              <select
-                value={settings.previewModel}
-                onChange={(e) => setSettings({ ...settings, previewModel: e.target.value as PreviewModel })}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="gemini-2.5-flash-image">Gemini 2.5 Flash (Fast)</option>
-                <option value="gemini-3-pro-image-preview">Gemini 3 Pro (Best Quality)</option>
-              </select>
-              <p className="text-xs text-slate-500">
-                Flash is faster but Imagen 3.0 produces higher quality results
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm text-slate-300">Final Model</label>
-              <select
-                value={settings.finalModel}
-                onChange={(e) => setSettings({ ...settings, finalModel: e.target.value as 'gemini-3-pro-image-preview' })}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="gemini-3-pro-image-preview">Gemini 3 Pro (Recommended)</option>
-              </select>
-              <p className="text-xs text-slate-500">
-                Final 4K images always use the highest quality model
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t border-slate-700 pt-4 space-y-4">
-            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">Seed Settings</h3>
+            <h3 className="text-sm font-medium text-slate-200 uppercase tracking-wide">Gemini seed settings</h3>
             
             <div className="space-y-2">
               <label className="flex items-center justify-between">
@@ -141,7 +109,7 @@ export function SettingsModal() {
             <div className="flex items-start gap-2 p-3 bg-slate-700/50 rounded-lg">
               <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-slate-400">
-                Seed may not be supported by all Gemini image endpoints. If rejected, AfterGlow will continue without seed and show a warning.
+                Kie.ai image models do not use seeds. Gemini continues without a seed if its image endpoint rejects it.
               </p>
             </div>
           </div>
@@ -161,6 +129,22 @@ export function SettingsModal() {
               </label>
               <p className="text-xs text-slate-500">
                 When disabled, EXIF data is stripped from output images (recommended for privacy)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-center justify-between">
+                <span className="text-sm text-slate-300">Save versions next to original</span>
+                <input
+                  type="checkbox"
+                  checked={settings.mirrorOutputsToSource !== false}
+                  onChange={(e) => setSettings({ ...settings, mirrorOutputsToSource: e.target.checked })}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500"
+                />
+              </label>
+              <p className="text-xs text-slate-500">
+                Copies each generated version into the folder the photo was imported from
+                (e.g. IMG_1234-AG01.png), so synchronizing that folder in Lightroom picks them up
               </p>
             </div>
 
@@ -203,7 +187,7 @@ export function SettingsModal() {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 p-4 border-t border-slate-700 sticky bottom-0 bg-slate-800">
+        <div className="flex justify-end gap-2 p-4 border-t border-slate-700 shrink-0 bg-slate-800">
           <button
             onClick={closeSettingsModal}
             className="px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"

@@ -33,7 +33,7 @@ export function ModuleInspectorShell({ selection, moduleType }: ModuleInspectorS
   const [extraInstructions, setExtraInstructions] = useState('')
   const [assembled, setAssembled] = useState<{ fullPrompt: string; promptHash: string } | null>(null)
   const [twilightPresetTemplate, setTwilightPresetTemplate] = useState<string>('')
-  const intendedModel = (settings.previewImageModel || settings.previewModel) as string
+  const intendedModel = ((moduleType === 'freeform' && settings.freeformImageModel) || settings.previewImageModel || settings.previewModel) as string
   const [resolvedProvider, setResolvedProvider] = useState(() => {
     return getResolvedProviderConfig({
       uiProvider: settings.imageProvider || 'google',
@@ -55,7 +55,7 @@ export function ModuleInspectorShell({ selection, moduleType }: ModuleInspectorS
     return `Apply to Selected (${count})`
   }, [selection.selectedAssetIds.length])
 
-  const providerDisplay = resolvedProvider.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'
+  const providerDisplay = resolvedProvider.provider === 'kie' ? 'Kie.ai' : resolvedProvider.provider === 'openrouter' ? 'OpenRouter' : 'Gemini'
 
   useEffect(() => {
     let cancelled = false

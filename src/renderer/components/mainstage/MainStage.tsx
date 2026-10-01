@@ -11,7 +11,6 @@ import {
   ChevronRight, 
   Image as ImageIcon, 
   Clock, 
-  Check, 
   Download, 
   Trash2,
   RotateCcw
@@ -51,12 +50,7 @@ export function getNewestGeneratedVersionIdForMainStage(orderedVersionsOldestFir
 }
 
 export function getCurrentPreferredVersionIdForMainStage(versions: Version[]): string | null {
-  const ordered = orderVersionsOldestFirst(versions)
-  const approved = ordered.find((v) => v.lifecycleStatus === 'approved')
-  if (approved) return approved.id
-
-  const newest = getNewestGeneratedVersionIdForMainStage(ordered)
-  return newest
+  return getNewestGeneratedVersionIdForMainStage(orderVersionsOldestFirst(versions))
 }
 
 export function getActiveVersionIndexForMainStage(params: {
@@ -87,7 +81,6 @@ export function getViewingLabelForMainStage(params: {
   const state = resolveGenerationStatus(params.viewedVersion)
   if (state === 'pending') return `${label} (Generating…)`
   if (state === 'failed') return `${label} (Failed)`
-  if (params.viewedVersion?.lifecycleStatus === 'approved') return `${label} (Pick)`
   return label
 }
 
@@ -113,7 +106,6 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
     setViewedVersionId,
     getLastAppliedVersionId,
     setLastAppliedVersionId,
-    approveVersion,
     deleteVersion
   } = useJobStore()
 
@@ -324,8 +316,7 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
     setViewedVersionId(singleSelectedAssetId, preferredId)
   }, [singleSelectedAssetId, orderedVersionsForSingle.length])
 
-  const isViewedApproved = !!viewedVersion && (viewedVersion.lifecycleStatus === 'approved' || viewedVersion.status === 'approved')
-  const canDeleteViewedVersion = !!selectedAsset && !!viewedVersionId && !isViewedApproved
+  const canDeleteViewedVersion = !!selectedAsset && !!viewedVersionId
 
   const handleShowOriginal = () => {
     if (!singleSelectedAssetId) return
@@ -359,11 +350,6 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
     if (!currentJob) return
     if (!singleSelectedAssetId) return
     if (!viewedVersionId) return
-
-    if (isViewedApproved) {
-      setHeaderInlineMessage('Approved versions are locked and cannot be deleted.')
-      return
-    }
 
     if (!confirm('Delete this version?')) return
     await deleteVersion(currentJob.id, viewedVersionId)
@@ -460,23 +446,13 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
   const isViewedPending = resolvedViewedGenerationStatus === 'pending'
   const isViewedFailed = resolvedViewedGenerationStatus === 'failed'
 
-  const handleApproveViewed = async () => {
-    if (!currentJob) return
-    if (!singleSelectedAssetId) return
-    if (!viewedVersionId) return
-    setHeaderInlineMessage(null)
-    await approveVersion(currentJob.id, viewedVersionId)
-    await loadVersionsForAsset(currentJob.id, singleSelectedAssetId)
-  }
-
   const handleExportViewed = async () => {
     if (!currentJob) return
     if (!viewedVersionId) return
 
     const suggestedName = (() => {
       const assetPart = selectedAsset?.id ? `_${selectedAsset.id}` : ''
-      const statusPart = isViewedApproved ? '_Approved' : '_Draft'
-      return `Afterglow${assetPart}${statusPart}`
+      return `Afterglow${assetPart}`
     })()
 
     await (globalThis as any)?.window?.api?.invoke?.('version:export', {
@@ -501,11 +477,6 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
             <div className="flex items-center gap-1.5 text-xs text-slate-300" data-testid="mainstage-generation-indicator">
               <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
               <span className="truncate">Generation failed</span>
-            </div>
-          )}
-          {selectionCount === 1 && viewedVersionId && isViewedApproved && (
-            <div className="text-[11px] font-semibold text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 rounded" data-testid="mainstage-approved-badge">
-              Approved
             </div>
           )}
           {selectionCount === 1 && headerInlineMessage && (
@@ -611,11 +582,6 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
                         orderedVersionsOldestFirst: orderedVersionsForSingle
                       })
                     }
-                    isApproved={(index) => {
-                      if (index === 0) return false
-                      const v = orderedVersionsForSingle[index - 1]
-                      return !!v && (v.lifecycleStatus === 'approved' || v.status === 'approved')
-                    }}
                     getAriaLabel={(index) => {
                       const total = 1 + orderedVersionsForSingle.length
                       if (index === 0) return 'View Original'
@@ -682,24 +648,10 @@ export function MainStage({ selectedAssetIds, assets }: MainStageProps) {
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={handleApproveViewed}
-                  disabled={!viewedVersionId || isViewedApproved}
-                  className={`p-2 rounded-lg transition-colors ${
-                    isViewedApproved 
-                      ? 'bg-emerald-600/20 text-emerald-400' 
-                      : 'hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300'
-                  }`}
-                  title={isViewedApproved ? 'Approved' : 'Approve'}
-                  data-testid="mainstage-approve-button"
-                >
-                  <Check className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
                   onClick={handleExportViewed}
                   disabled={!viewedVersionId}
                   className="p-2 rounded-lg hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  title={`Export${isViewedApproved ? '' : ' (Draft)'}`}
+                  title="Export"
                   data-testid="mainstage-export-button"
                 >
                   <Download className="w-5 h-5 text-slate-300" />

@@ -12,7 +12,7 @@ function getSettingsPath(): string {
     : join(app.getAppPath(), 'afterglow-settings.json')
 }
 
-export type PreviewModel = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'
+export type PreviewModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image-preview'
 export type FinalModel = 'gemini-3-pro-image-preview'
 export type SeedStrategy = 'randomPerImage' | 'fixedPerRun'
 export type LightingCondition = 'overcast' | 'sunny'
@@ -37,6 +37,7 @@ export interface Settings {
   
   // Provider configuration (API keys in .env only)
   imageProvider: ImageProvider
+  freeformImageModel?: string
   previewImageModel: string
   previewPriorityMode: boolean
   advancedCustomModel: string
@@ -57,6 +58,10 @@ export interface Settings {
   watchFolderPath: string | null
   watchFolderJobId: string | null
 
+  // Mirror generated versions next to the imported original (e.g. the Lightroom
+  // folder) as {name}-AG{NN}, so a Lightroom folder sync picks them up
+  mirrorOutputsToSource: boolean
+
   // Privacy settings
   privacy: {
     safeFilenamesOnImport: boolean
@@ -71,7 +76,7 @@ const DEFAULT_SETTINGS: Settings = {
   concurrentPreviews: 3,
   autoApproveAll: false,
   theme: 'dark',
-  previewModel: 'gemini-2.5-flash-image',
+  previewModel: 'gemini-3.1-flash-image',
   finalModel: 'gemini-3-pro-image-preview',
   useSeed: true,
   reusePreviewSeedForFinal: true,
@@ -81,6 +86,7 @@ const DEFAULT_SETTINGS: Settings = {
   
   // Provider configuration (API keys in .env only)
   imageProvider: 'google',
+  freeformImageModel: '',
   previewImageModel: 'gemini-3-pro-image-preview',
   previewPriorityMode: true,
   advancedCustomModel: '',
@@ -98,6 +104,9 @@ const DEFAULT_SETTINGS: Settings = {
   watchFolderEnabled: false,
   watchFolderPath: null,
   watchFolderJobId: null,
+
+  // Mirror outputs back to the source folder
+  mirrorOutputsToSource: true,
 
   // Privacy settings
   privacy: {
@@ -119,6 +128,10 @@ export async function getSettings(): Promise<Settings> {
   try {
     const data = await readFile(getSettingsPath(), 'utf-8')
     cachedSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) }
+    // gemini-2.5-flash-image was shut down on 2026-10-02.
+    for (const key of ['previewModel', 'previewImageModel', 'advancedCustomModel'] as const) {
+      if (cachedSettings![key] === 'gemini-2.5-flash-image') (cachedSettings as any)[key] = 'gemini-3.1-flash-image'
+    }
     return cachedSettings!
   } catch {
     cachedSettings = { ...DEFAULT_SETTINGS }

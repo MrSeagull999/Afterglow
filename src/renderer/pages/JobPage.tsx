@@ -430,9 +430,7 @@ export function JobPage() {
             activeModule={activeModule}
             selectedAssetIds={Array.from(selectedAssetIds)}
             assets={assets}
-            onApply={() => runBatchGeneration('preview')}
-            onApplyHQ={() => runBatchGeneration('hq_preview')}
-            onApplyNative4K={() => runBatchGeneration('native_4k')}
+            onApply={() => runBatchGeneration('native_4k')}
           />
         }
       />

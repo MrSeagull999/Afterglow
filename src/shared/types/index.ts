@@ -81,6 +81,10 @@ export interface Asset {
   // When set, subsequent modules will use this path instead of originalPath
   workingSourcePath?: string
   workingSourceVersionId?: string  // The version ID that produced the working source
+
+  // Where the file was imported from (e.g. the Lightroom folder). When set,
+  // generated versions are mirrored next to it so a Lightroom folder sync sees them.
+  sourceOriginPath?: string
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -105,6 +109,7 @@ export interface Version {
 
   outputPath?: string
   thumbnailPath?: string
+  mirrorPath?: string  // Copy of the output next to the asset's sourceOriginPath (Lightroom folder)
   error?: string
 
   generationStatus?: GenerationStatus

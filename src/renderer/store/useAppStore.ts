@@ -10,7 +10,7 @@ export type ImageStatus =
   | 'final_ready'
   | 'error'
 
-export type PreviewModel = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'
+export type PreviewModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image-preview'
 export type FinalModel = 'gemini-3-pro-image-preview'
 export type SeedStrategy = 'randomPerImage' | 'fixedPerRun'
 export type LightingCondition = 'overcast' | 'sunny'
@@ -77,12 +77,16 @@ export interface Settings {
   
   // Provider settings
   imageProvider?: 'google' | 'openrouter'
+  freeformImageModel?: string
   previewImageModel?: string
   previewPriorityMode?: boolean
   advancedCustomModel?: string
 
   // Prompt style: 'full' uses detailed prompts, 'simplified' uses concise prompts
   promptStyle?: 'full' | 'simplified'
+
+  // Mirror generated versions next to the imported original (Lightroom folder)
+  mirrorOutputsToSource?: boolean
 
   // Auto-evaluation
   evaluationEnabled?: boolean
@@ -171,13 +175,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     concurrentPreviews: 3,
     autoApproveAll: false,
     theme: 'dark',
-    previewModel: 'gemini-2.5-flash-image',
+    previewModel: 'gemini-3.1-flash-image',
     finalModel: 'gemini-3-pro-image-preview',
     useSeed: true,
     reusePreviewSeedForFinal: true,
     seedStrategy: 'randomPerImage',
     fixedRunSeed: null,
-    defaultLightingCondition: 'overcast'
+    defaultLightingCondition: 'overcast',
+    mirrorOutputsToSource: true
   },
   costEstimate: null,
   isLoading: false,

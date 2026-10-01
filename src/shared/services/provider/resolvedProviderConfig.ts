@@ -1,4 +1,6 @@
-export type ResolvedProvider = 'openrouter' | 'gemini'
+import { isKieImageModel } from './kieModels'
+
+export type ResolvedProvider = 'openrouter' | 'gemini' | 'kie'
 export type ProviderResolvedBy = 'ui' | 'env_override'
 
 export interface ResolvedProviderConfig {
@@ -14,6 +16,9 @@ export function getResolvedProviderConfig(params: {
   intendedModel: string
   env?: Record<string, string | undefined>
 }): ResolvedProviderConfig {
+  if (isKieImageModel(params.intendedModel)) {
+    return { provider: 'kie', model: params.intendedModel, endpointBaseUrl: 'https://api.kie.ai/api/v1', resolvedBy: 'ui' }
+  }
   const env = params.env || {}
 
   const uiProviderRaw = params.uiProvider || 'google'

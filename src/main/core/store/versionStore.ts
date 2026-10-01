@@ -1,10 +1,11 @@
-import { readFile, writeFile, rm } from 'fs/promises'
+import { readFile, writeFile, rm, readdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import type { Version, VersionStatus, VersionRecipe, ModuleType, QualityTier, GenerationStatus } from '../../../shared/types'
-import { getJobDirectory } from './jobStore'
-import { addVersionToAsset, removeVersionFromAsset } from './assetStore'
+import { getJobDirectory, listJobs } from './jobStore'
+import { addVersionToAsset, removeVersionFromAsset, getAsset } from './assetStore'
 import { getSettings } from '../settings'
+import { mirrorOutputToSource, removeMirroredOutput } from '../services/sourceMirror'
 
 function generateVersionId(): string {
   const now = new Date()
@@ -57,10 +58,6 @@ export async function createFinalFromApprovedVersion(params: {
 
 function getVersionPath(jobId: string, versionId: string): string {
   return join(getJobDirectory(jobId), 'versions', `${versionId}.json`)
-}
-
-export function isVersionDeletionLocked(version: Pick<Version, 'lifecycleStatus' | 'status'>): boolean {
-  return version.lifecycleStatus === 'approved' || version.status === 'approved' || version.status === 'final_ready'
 }
 
 export function getApprovalInvariantUpdates(params: {
@@ -204,6 +201,30 @@ export async function setVersionGenerationStatus(
   return updateVersion(jobId, versionId, updates)
 }
 
+export const INTERRUPTED_GENERATION_ERROR = 'Generation was interrupted because AfterGlow closed. Generate again to retry.'
+
+// Generation runs in the main process, so anything still pending at launch
+// belongs to a previous process that quit or crashed mid-render.
+export async function failInterruptedGenerations(): Promise<number> {
+  let count = 0
+  for (const job of await listJobs()) {
+    const versionsDir = join(getJobDirectory(job.id), 'versions')
+    if (!existsSync(versionsDir)) continue
+    for (const file of await readdir(versionsDir)) {
+      if (!file.endsWith('.json')) continue
+      const version = await getVersion(job.id, file.slice(0, -5))
+      if (version?.generationStatus !== 'pending') continue
+      await updateVersion(job.id, version.id, {
+        ...getGenerationStatusUpdates('failed', Date.now(), INTERRUPTED_GENERATION_ERROR),
+        status: 'error',
+        error: INTERRUPTED_GENERATION_ERROR
+      })
+      count++
+    }
+  }
+  return count
+}
+
 export async function getVersion(jobId: string, versionId: string): Promise<Version | null> {
   const versionPath = getVersionPath(jobId, versionId)
   if (!existsSync(versionPath)) {
@@ -241,14 +262,18 @@ export async function deleteVersion(jobId: string, versionId: string): Promise<b
   const version = await getVersion(jobId, versionId)
   if (!version) return false
 
-  if (isVersionDeletionLocked(version)) {
-    return false
-  }
-
   const versionPath = getVersionPath(jobId, versionId)
   await rm(versionPath, { force: true })
 
   await removeVersionFromAsset(jobId, version.assetId, versionId)
+
+  if (version.mirrorPath) {
+    try {
+      await removeMirroredOutput(version.mirrorPath)
+    } catch (error) {
+      console.error(`[VersionStore] Failed to remove mirrored output ${version.mirrorPath}:`, error)
+    }
+  }
 
   return true
 }
@@ -287,7 +312,36 @@ export async function setVersionOutput(
   if (thumbnailPath) {
     updates.thumbnailPath = thumbnailPath
   }
-  return updateVersion(jobId, versionId, updates)
+  const updated = await updateVersion(jobId, versionId, updates)
+
+  if (updated) {
+    const mirrorPath = await mirrorVersionOutput(jobId, updated)
+    if (mirrorPath && mirrorPath !== updated.mirrorPath) {
+      return updateVersion(jobId, versionId, { mirrorPath })
+    }
+  }
+  return updated
+}
+
+// Copy the render next to the asset's Lightroom source so a folder sync sees it.
+// Mirroring must never fail the generation itself.
+async function mirrorVersionOutput(jobId: string, version: Version): Promise<string | null> {
+  try {
+    const settings = await getSettings()
+    if (!settings.mirrorOutputsToSource || !version.outputPath) return null
+
+    const asset = await getAsset(jobId, version.assetId)
+    if (!asset?.sourceOriginPath) return null
+
+    return await mirrorOutputToSource({
+      sourceOriginPath: asset.sourceOriginPath,
+      outputPath: version.outputPath,
+      existingMirrorPath: version.mirrorPath
+    })
+  } catch (error) {
+    console.error(`[VersionStore] Failed to mirror output for version ${version.id}:`, error)
+    return null
+  }
 }
 
 export async function approveVersion(jobId: string, versionId: string): Promise<Version[] | null> {
@@ -440,7 +494,7 @@ export async function createHQRegenVersion(params: {
   })
 
   const settings = await getSettings()
-  const model = selectHqRegenModel({
+  const model = (approved.module === 'freeform' && approved.model) || selectHqRegenModel({
     advancedCustomModel: settings.advancedCustomModel,
     previewImageModel: settings.previewImageModel,
     previewModel: settings.previewModel
@@ -534,7 +588,7 @@ export async function createNative4KFromApprovedVersion(params: {
     : null
 
   const settings = await getSettings()
-  const model = selectNative4KModel({
+  const model = (sourceVersion.module === 'freeform' && sourceVersion.model) || selectNative4KModel({
     advancedCustomModel: settings.advancedCustomModel,
     previewImageModel: settings.previewImageModel,
     previewModel: settings.previewModel

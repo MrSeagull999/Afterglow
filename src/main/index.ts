@@ -8,6 +8,7 @@ import { startHttpServer } from './server/httpServer'
 import { startWatching, stopWatching, getWatchFolderState } from './core/services/watchFolder/watchFolderService'
 import { getSettings, updateSettings } from './core/settings'
 import { createAsset } from './core/store/assetStore'
+import { failInterruptedGenerations } from './core/store/versionStore'
 
 // Load .env from project root
 const envPath = app.isPackaged 
@@ -97,10 +98,10 @@ function createWindow(): void {
     backgroundColor: '#0f172a'
   })
 
-  setupIpcHandlers(mainWindow)
-  
-  // Register handlers only once
+  // Register handlers only once — createWindow runs again on macOS reactivate,
+  // and ipcMain.handle throws if a channel is registered twice.
   if (!handlersRegistered) {
+    setupIpcHandlers(() => mainWindow)
     registerAllHandlers() // Phase 2 handlers
     handlersRegistered = true
   }
@@ -137,6 +138,12 @@ app.whenReady().then(async () => {
       console.error('[Migration] Errors:', errors)
     }
   }
+
+  const interrupted = await failInterruptedGenerations().catch((error) => {
+    console.error('[Startup] Failed to recover interrupted generations:', error)
+    return 0
+  })
+  if (interrupted > 0) console.log(`[Startup] Marked ${interrupted} interrupted generation(s) as failed`)
 
   startHttpServer(3737)
   createWindow()

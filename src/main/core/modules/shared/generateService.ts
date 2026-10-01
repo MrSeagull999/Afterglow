@@ -1,3 +1,4 @@
+import { getKieImageModel } from '../../../../shared/services/provider/kieModels'
 import { readFile, mkdir } from 'fs/promises'
 import { join, dirname, basename } from 'path'
 import { existsSync } from 'fs'
@@ -189,8 +190,8 @@ export async function generateVersionPreview(
     const selectionCount = 1
     const { provider, resolved } = await getResolvedImageProvider(model)
 
-    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
-    const endpoint = resolved.provider === 'openrouter'
+    const providerName = resolved.provider === 'gemini' ? 'google' : resolved.provider
+    const endpoint = resolved.provider === 'kie' ? `${resolved.endpointBaseUrl}/jobs/createTask` : resolved.provider === 'openrouter'
       ? `${resolved.endpointBaseUrl}/chat/completions`
       : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
 
@@ -554,8 +555,8 @@ export async function generateVersionHQPreview(
 
     const selectionCount = 1
     const { provider, resolved } = await getResolvedImageProvider(model)
-    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
-    const endpoint = resolved.provider === 'openrouter'
+    const providerName = resolved.provider === 'gemini' ? 'google' : resolved.provider
+    const endpoint = resolved.provider === 'kie' ? `${resolved.endpointBaseUrl}/jobs/createTask` : resolved.provider === 'openrouter'
       ? `${resolved.endpointBaseUrl}/chat/completions`
       : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
 
@@ -804,8 +805,8 @@ export async function generateVersionFinal(
 
     const selectionCount = 1
     const { provider, resolved } = await getResolvedImageProvider(model)
-    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
-    const endpoint = resolved.provider === 'openrouter'
+    const providerName = resolved.provider === 'gemini' ? 'google' : resolved.provider
+    const endpoint = resolved.provider === 'kie' ? `${resolved.endpointBaseUrl}/jobs/createTask` : resolved.provider === 'openrouter'
       ? `${resolved.endpointBaseUrl}/chat/completions`
       : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
 
@@ -930,7 +931,8 @@ export async function generateVersionNative4K(
 
     // Calculate aspect ratio from source image - match to closest supported ratio
     // Supported ratios: "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
-    const aspectRatio = findClosestAspectRatio(sourceWidth, sourceHeight)
+    // GPT Image on Kie lacks 4:5/5:4, so let it infer; Nano Banana takes the same ratios as Gemini.
+    const aspectRatio = getKieImageModel(version.model || '')?.family === 'gpt-image' ? 'auto' : findClosestAspectRatio(sourceWidth, sourceHeight)
 
     console.log(`[GenerateService] Native 4K: Source dimensions ${sourceWidth}x${sourceHeight}, matched aspect ratio: ${aspectRatio}`)
 
@@ -1025,8 +1027,8 @@ export async function generateVersionNative4K(
 
     const selectionCount = 1
     const { provider, resolved } = await getResolvedImageProvider(model)
-    const providerName = resolved.provider === 'openrouter' ? 'openrouter' : 'google'
-    const endpoint = resolved.provider === 'openrouter'
+    const providerName = resolved.provider === 'gemini' ? 'google' : resolved.provider
+    const endpoint = resolved.provider === 'kie' ? `${resolved.endpointBaseUrl}/jobs/createTask` : resolved.provider === 'openrouter'
       ? `${resolved.endpointBaseUrl}/chat/completions`
       : `${resolved.endpointBaseUrl}/models/${model}:generateContent`
 

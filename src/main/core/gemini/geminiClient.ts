@@ -11,7 +11,7 @@ export function isApiKeyConfigured(): boolean {
   return !!apiKey && apiKey !== 'your_gemini_api_key_here'
 }
 
-export type ImageModel = 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'
+export type ImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image-preview'
 export type ImageSize = '1024x1024' | '1536x1536' | '2048x2048'
 
 export interface GeminiImageRequest {

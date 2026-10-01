@@ -1,3 +1,4 @@
+import { getSettings } from '../../settings'
 import type { Version, VersionRecipe } from '../../../../shared/types'
 import { getAsset } from '../../store/assetStore'
 import { getVersion } from '../../store/versionStore'
@@ -93,7 +94,7 @@ export async function generateFreeformPreview(params: FreeformParams): Promise<V
     recipe,
     sourceVersionIds: params.sourceVersionId ? [params.sourceVersionId] : [],
     seed: params.seed,
-    model: params.model
+    model: params.model || (await getSettings()).freeformImageModel || undefined
   })
 
   return version

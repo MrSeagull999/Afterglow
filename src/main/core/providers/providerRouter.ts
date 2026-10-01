@@ -1,3 +1,4 @@
+import { KieImageProvider } from './KieImageProvider'
 import type { IImageProvider } from './IImageProvider'
 import { GoogleGeminiProvider } from './GoogleGeminiProvider'
 import { OpenRouterProvider } from './OpenRouterProvider'
@@ -25,6 +26,10 @@ export async function getResolvedImageProvider(intendedModel: string): Promise<{
     intendedModel,
     env: process.env
   })
+
+  if (resolved.provider === 'kie') {
+    return { resolved, provider: new KieImageProvider(process.env.KIE_API_KEY || '') }
+  }
 
   if (resolved.provider === 'openrouter') {
     const apiKey = process.env.OPENROUTER_API_KEY || ''

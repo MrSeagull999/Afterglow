@@ -18,8 +18,6 @@ export interface InspectorPanelProps {
   selectedAssetIds: string[]
   assets: Asset[]
   onApply: () => void
-  onApplyHQ?: () => void
-  onApplyNative4K?: () => void
   isApplyingDisabled?: boolean
 }
 
@@ -62,9 +60,6 @@ export function InspectorPanel(props: InspectorPanelProps) {
     getViewedVersionId,
     setViewedVersionId,
     setLastAppliedVersionId,
-    loadVersionsForAsset,
-    approveVersion,
-    unapproveVersion,
     activeBatchRun,
     versionsByAssetId,
     dismissBatchRun,
@@ -99,28 +94,6 @@ export function InspectorPanel(props: InspectorPanelProps) {
     viewedVersion
   })
 
-  const canApproveViewed = !!(currentJob && viewedVersion && selectionCount === 1)
-  const canGenerateFinalViewed = !!(
-    currentJob &&
-    viewedVersion &&
-    selectionCount === 1 &&
-    (viewedVersion.status === 'approved' || viewedVersion.status === 'hq_ready')
-  )
-
-  const canRegenerateHqViewed = !!(
-    currentJob &&
-    viewedVersion &&
-    selectionCount === 1 &&
-    viewedVersion.status === 'approved'
-  )
-
-  const canGenerateNative4K = !!(
-    currentJob &&
-    viewedVersion &&
-    selectionCount === 1 &&
-    (viewedVersion.status === 'approved' || viewedVersion.status === 'hq_ready')
-  )
-
   const selectionSummary = useMemo(() => {
     if (selectionCount === 0) return 'Selected: 0'
     if (selectionCount === 1) {
@@ -139,55 +112,6 @@ export function InspectorPanel(props: InspectorPanelProps) {
 
   const applyLabel = `Apply to Selected (${selectionCount})`
   const isApplyDisabled = (props.isApplyingDisabled ?? false) || selectionCount === 0 || !props.activeModule
-
-  const handleApproveViewed = async () => {
-    if (!currentJob || !viewedVersion || selectionCount !== 1) return
-    try {
-      if (viewedVersion.status === 'approved') {
-        await unapproveVersion(currentJob.id, viewedVersion.id)
-        addToast('Version unapproved', 'success')
-      } else {
-        await approveVersion(currentJob.id, viewedVersion.id)
-        addToast('Version approved', 'success')
-      }
-      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
-    } catch (error) {
-      addToast('Failed to update approval', 'error')
-    }
-  }
-
-  const handleGenerateFinalViewed = async () => {
-    if (!currentJob || !viewedVersion || selectionCount !== 1) return
-    try {
-      await window.api.invoke('version:generateFinal', currentJob.id, viewedVersion.id)
-      addToast('Final generation started', 'success')
-      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
-    } catch (error) {
-      addToast('Failed to start final generation', 'error')
-    }
-  }
-
-  const handleRegenerateHqViewed = async () => {
-    if (!currentJob || !viewedVersion || selectionCount !== 1) return
-    try {
-      await window.api.invoke('version:regenerateHQ', currentJob.id, viewedVersion.id)
-      addToast('Regenerate (HQ) started', 'success')
-      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
-    } catch (error) {
-      addToast('Failed to start HQ regenerate', 'error')
-    }
-  }
-
-  const handleGenerateNative4K = async () => {
-    if (!currentJob || !viewedVersion || selectionCount !== 1) return
-    try {
-      await window.api.invoke('version:generateNative4K', currentJob.id, viewedVersion.id)
-      addToast('Native 4K generation started', 'success')
-      await loadVersionsForAsset(currentJob.id, props.selectedAssetIds[0])
-    } catch (error) {
-      addToast('Failed to start Native 4K generation', 'error')
-    }
-  }
 
   const handleUseAsSource = async () => {
     if (!currentJob || !viewedVersion || selectionCount !== 1) return
@@ -442,67 +366,16 @@ export function InspectorPanel(props: InspectorPanelProps) {
 
       {/* 7) Primary Action — hidden for Sky (has its own Generate button in SkyPanel) */}
       {props.activeModule !== 'sky' && <div data-testid="section-primary-action" className="flex-shrink-0 p-4 border-t border-slate-700 bg-slate-800/80">
-        {/* Generation Buttons - Preview, HQ Preview, and Native 4K */}
-        <div className="flex gap-2 mb-3">
-          <button
-            type="button"
-            onClick={props.onApply}
-            disabled={isApplyDisabled}
-            className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
-            title="Generate quick preview"
-          >
-            <div className="text-sm font-medium">Preview</div>
-          </button>
-
-          <button
-            type="button"
-            onClick={props.onApplyHQ}
-            disabled={isApplyDisabled || !props.onApplyHQ}
-            className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
-            title="Generate HQ preview with Nano Banana Pro 2K - preview what 4K will look like"
-          >
-            <div className="text-sm font-medium">HQ Preview (2K)</div>
-          </button>
-
-          <button
-            type="button"
-            onClick={props.onApplyNative4K}
-            disabled={isApplyDisabled || !props.onApplyNative4K}
-            className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
-            title="Generate true 4K version (3840×2160) directly - skip preview if you trust your prompt"
-          >
-            <div className="text-sm font-medium">Native 4K</div>
-          </button>
-        </div>
-
-        {/* Version Actions - Approve, 4K, Use as Source */}
-        {selectionCount === 1 && currentJob && viewedVersion && (
-          <div className="flex items-center gap-2 mb-3">
-            <button
-              type="button"
-              onClick={handleApproveViewed}
-              disabled={!canApproveViewed}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                viewedVersion.status === 'approved'
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-slate-700 hover:bg-emerald-600 text-slate-200 hover:text-white'
-              }`}
-            >
-              {viewedVersion.status === 'approved' ? 'Unapprove' : 'Approve'}
-            </button>
-
-            {canGenerateNative4K && (
-              <button
-                type="button"
-                onClick={handleGenerateNative4K}
-                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors bg-amber-600 hover:bg-amber-700 text-white"
-                title="Generate true 4K version (3840×2160) using native model resolution"
-              >
-                Generate 4K
-              </button>
-            )}
-          </div>
-        )}
+        {/* Generate — every generation is Native 4K */}
+        <button
+          type="button"
+          onClick={props.onApply}
+          disabled={isApplyDisabled}
+          className="w-full mb-3 px-4 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors"
+          title="Generate a native 4K version"
+        >
+          Generate 4K
+        </button>
 
         {canUseAsSource && (
           <div className="mb-3">

@@ -3,7 +3,7 @@ export interface GenerationLogEntry {
   requestId?: string
   jobId: string
   versionId: string
-  provider: 'google' | 'openrouter'
+  provider: 'google' | 'openrouter' | 'kie'
   model: string
   endpoint: string
   endpointBaseUrl?: string

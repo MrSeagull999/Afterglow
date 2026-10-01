@@ -33,3 +33,15 @@ flow is slated for removal.
   open JobPage refreshes.
 - Single-instance lock is required — don't remove it, or LR opens spawn a
   second app that fights over port 3737.
+
+## Mirroring outputs back to Lightroom
+
+- `createAsset` with a `sourcePath` records it as `asset.sourceOriginPath`;
+  every `setVersionOutput` then copies the render next to that file as
+  `{name}-AG{NN}.{ext}` (`src/main/core/services/sourceMirror.ts`), so an LR
+  folder sync picks up new versions. Later renders of the same version
+  (HQ/final) replace their mirror in place via `version.mirrorPath`; deleting
+  a version deletes its mirror. Toggle: `settings.mirrorOutputsToSource`.
+- The watch folder ignores `-AG{NN}` files so mirrors don't re-import.
+- Assets imported before this feature have no `sourceOriginPath` and are
+  silently skipped.

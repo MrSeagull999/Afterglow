@@ -17,7 +17,9 @@ export class GoogleGeminiProvider implements IImageProvider {
       return { success: false, error: 'Google API key not configured' }
     }
 
-    const { prompt, imageData, mimeType, model, imageSize = '1024x1024', aspectRatio, seed, referenceImages } = request
+    const { prompt, imageData, mimeType, imageSize = '1024x1024', aspectRatio, seed, referenceImages } = request
+    // Older versions recorded gemini-2.5-flash-image, which was shut down on 2026-10-02.
+    const model = request.model === 'gemini-2.5-flash-image' ? 'gemini-3.1-flash-image' : request.model
     const includeSeed = seed !== null && seed !== undefined
 
     try {
